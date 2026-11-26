@@ -4,7 +4,7 @@ All notable changes to True Import Cost are documented here. The extension and t
 
 ## 0.1.0
 
-The first release. It covers milestones v0.1 to v0.3 of the [roadmap](docs/roadmap.md): the core extension, Vite and Vue support, and the dependency graph.
+The first release. It covers milestones v0.1 to v0.4 of the [roadmap](docs/roadmap.md): the core extension, Vite and Vue support, the dependency graph, and the dashboard with build comparisons.
 
 ### Extension
 
@@ -21,6 +21,11 @@ The first release. It covers milestones v0.1 to v0.3 of the [roadmap](docs/roadm
 - Stale detection: hints say `source changed` once a file is newer than its build
 - Watching: metadata files are re-read when the build writes them, and the last good snapshot stays when a file cannot be read
 - Restricted Mode support; no network access, no telemetry, nothing executed
+- Bundle dashboard: treemap, initial and lazily loaded chunks, CSS and assets by kind, packages with versions and lazy part, duplicates, size history and a comparison across build targets
+- Compare Builds: pin a baseline or compare with any metafile or snapshot; every package, chunk and module shows its change, and so does the status bar
+- Size budgets per target for the total, the initial load, JavaScript, CSS, single imports and named packages, with warnings on the imports concerned
+- Show Importers: from a package or module to the lines that import it
+- Baselines and size history live in VS Code's storage for the workspace, never in the workspace
 
 ### `@true-import-cost/esbuild` 0.1.0
 

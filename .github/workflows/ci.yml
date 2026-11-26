@@ -21,6 +21,9 @@ jobs:
       required-files: |
         out/extension.js
         out/parser.js
+        public/dashboard.js
+        public/dashboard.css
+        media/dashboard.html
         assets/icon-x512.png
         assets/activity-bar.svg
 

@@ -96,6 +96,18 @@ suite('True Import Cost in VS Code', () => {
         assert.match(diagnostics[0]?.message ?? '', /dup-lib is bundled 2 times/);
     });
 
+    test('opens the bundle dashboard in a webview tab', async () => {
+        await vscode.commands.executeCommand('trueImportCost.showDashboard');
+
+        const tab = await waitFor(() => Promise.resolve(vscode.window.tabGroups.all
+            .flatMap(group => group.tabs)
+            .find(candidate => candidate.label === 'Bundle Dashboard')), 'the dashboard tab');
+
+        assert.ok(tab.input instanceof vscode.TabInputWebview, 'the dashboard is a webview');
+        assert.match(tab.input.viewType, /trueImportCost\.dashboard$/);
+        await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
+    });
+
     test('explains why the import under the cursor is included', async () => {
         const editor = await openExtensionSource();
         const position = positionOf(editor.document, '\'big-library\'');

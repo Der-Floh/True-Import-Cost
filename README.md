@@ -20,7 +20,11 @@ See what each import really costs **in your production build** — read from the
 - **Duplicate packages** — a package bundled in two versions, or from two install locations, gets an information diagnostic with the size of each copy
 - **Stale-result detection** — a file changed since the last build says `source changed` instead of passing old numbers off as current
 - **Bundle Contents view** — the packages, project sources and bundler-generated code of the active target, largest first
-- **Local and read-only** — no network access, no telemetry, never executes workspace code. Build metadata is validated and size-limited before it is read
+- **Bundle dashboard** — a treemap of the build, initial versus lazily loaded chunks, CSS, images, fonts and WebAssembly, the largest packages, duplicates, budgets and a size history, all a click away from the code
+- **Compare builds** — pin a build as the baseline, or pick any metafile or snapshot, and every package, chunk and module shows what changed since
+- **Size budgets** — limits per target for the total, the initial load, JavaScript, CSS, any single import and named packages. An import or package over budget gets a warning where it is imported
+- **Show importers** — from a package or module to every line in your code that imports it
+- **Local and read-only** — no network access, no telemetry, never executes workspace code. Build metadata is validated and size-limited before it is read, and nothing is written to the workspace
 
 ---
 
@@ -111,6 +115,30 @@ Hover an import for the full picture: the table below, the packages it pulls in,
 
 Attribution is per module: bundlers report what each **module** contributes, not what each import statement or function does, so a module that several imports reach counts toward each of them. Exclusive bytes assume the rest of the build stays as it is; removing an import can also change minification and chunking. [docs/measurements.md](docs/measurements.md) has the details. A standalone size and a measured marginal cost from differential builds are on the [roadmap](docs/roadmap.md).
 
+### Bundle dashboard
+
+**Show Bundle Dashboard** — or the graph icon on the *Bundle Contents* view — opens the whole build of a target at a glance:
+
+- **Sizes** — total, JavaScript, CSS, other assets, the initial load (entry chunks, what they import statically and their CSS) and what loads lazily, each with its change since the baseline
+- **Treemap** — project sources by folder, each package instance and the bundler's own code, sized by what the build kept. Click a tile to look inside it, or to open the module; lazily loaded code is marked
+- **Packages** — every bundled package with its versions, its lazily loaded part, its change and its budget, sortable and searchable, with *Explain why included* and *Show importers* on each
+- **Chunks and assets**, **duplicates**, **budgets**, the **modules that changed most** since the baseline, the **size history** of the target and, with several targets, a **comparison** of each package across them
+
+**Compare Builds** pins the current build as the baseline, or compares with any metafile or snapshot you pick; the status bar then shows the change as well. Baselines and the size history are kept in VS Code's storage for this workspace, never in the workspace itself.
+
+### Size budgets
+
+```json
+{
+    "trueImportCost.budgets": {
+        "webview": { "initial": "600 kB", "css": "80 kB", "packages": { "moment": 0, "lodash*": "30 kB" } },
+        "*": { "import": "100 kB" }
+    }
+}
+```
+
+Budgets are keyed by build target, or `*` for every target; a target's own budget wins field by field. Sizes are bytes or text such as `30 kB`, `1.5 MB` or `500 KiB`. An import whose bundled size is over `import`, or a package over its limit in `packages`, gets a warning on the import; `total`, `initial`, `javascript` and `css` are checked in the status bar and the dashboard.
+
 ### Build targets
 
 Every metadata file is one build target, named after its `target` (snapshots), its `id` in `trueImportCost.targets`, or its file name. A file that several targets contain — shared code in an extension host and a webview — is measured against one of them at a time: **Select Build Target** picks it, or *Automatic* uses the first target that contains the file. The hover lists the cost in every other target.
@@ -125,6 +153,10 @@ Every metadata file is one build target, named after its `target` (snapshots), i
 | **True Import Cost: Explain Why Included** | Show the import chains that pull a module or package into the build — for the import under the cursor, or one you pick |
 | **True Import Cost: Toggle Inline Hints** | Turn the inline hints on or off (`trueImportCost.inlayHints.enabled`) |
 | **True Import Cost: Clear Cache** | Forget every analysis and snapshot, and read everything again |
+| **True Import Cost: Show Bundle Dashboard** | Open the dashboard of the active target |
+| **True Import Cost: Compare Builds** | Pin the current build as the baseline, compare with a metafile or snapshot, or clear the baseline |
+| **True Import Cost: Show Importers** | List every line that imports a package or module — the one under the cursor, or one picked in a view — and go to it |
+| **True Import Cost: Clear Build History** | Forget the recorded size history of every target in this workspace |
 | **True Import Cost: Show Log** | Open the log, which says which metadata was read and why a file was rejected |
 
 The **True Import Cost** activity bar view has **Bundle Contents** (packages and modules of the active target, largest first) and **Why Included**. The status bar shows the active target and its total size; click it to switch targets.
@@ -147,6 +179,8 @@ The **True Import Cost** activity bar view has **Bundle Contents** (packages and
 | `trueImportCost.analysis.debounceMs` | `number` | `300` | How long a document has to stay unchanged before it is analysed again |
 | `trueImportCost.diagnostics.duplicatePackages` | `boolean` | `true` | Flag imports of a package that is bundled more than once |
 | `trueImportCost.maxMetadataSizeMB` | `number` | `64` | Largest metadata file that is read; larger ones are rejected unread |
+| `trueImportCost.budgets` | `object` | `{}` | Size budgets per build target; see [Size budgets](#size-budgets) |
+| `trueImportCost.history.enabled` | `boolean` | `true` | Record the size of each new build for the dashboard's history chart |
 
 An entry of `trueImportCost.targets`:
 
@@ -209,7 +243,8 @@ Bug reports and feature requests are welcome via [Issues](https://github.com/Der
 | --- | --- | --- |
 | Core | `src/core` | The snapshot schema and its validation, the esbuild and Rollup/Rolldown adapters, the module graph (reachability, exclusive and shared bytes, why-included chains, duplicates) and import attribution. No `vscode`, no Node built-ins: the bundler plugins and a future CLI reuse it |
 | Parser | `src/parser` | Import extraction and symbol-based usage analysis with the TypeScript compiler API, and Vue single-file components through `@vue/compiler-dom`. Bundled separately and loaded on first use, so activation does not pay for TypeScript |
-| Extension | `src/extension` | Finding, reading and watching metadata, build targets, inlay hints, hovers, diagnostics, views and commands |
+| Extension | `src/extension` | Finding, reading and watching metadata, build targets, inlay hints, hovers, diagnostics, views, commands, baselines and history |
+| Dashboard | `src/webview`, `src/shared` | Vue 3 webview built with Vite into one script, talking to the host only through the message contract in `src/shared` |
 | Bundler plugins | `src/plugins`, published from `packages/` | `@true-import-cost/esbuild` and `@true-import-cost/vite`, built from the same core sources |
 
 [docs/architecture.md](docs/architecture.md) explains the data flow, [docs/snapshot-schema.md](docs/snapshot-schema.md) the metadata format and [docs/roadmap.md](docs/roadmap.md) what comes next.
@@ -220,9 +255,9 @@ npm, and nothing else — packaging needs it regardless, since `vsce` shells out
 
 ```bash
 npm ci                   # install exactly what package-lock.json pins
-npm run compile          # check-types + lint + both host bundles + the plugin packages
+npm run compile          # check-types + lint + both host bundles + the dashboard + the plugin packages
 npm run watch            # esbuild and tsc watchers, which is what F5 starts
-npm test                 # build, then vitest: core, builds, host and repo
+npm test                 # build, then vitest: core, builds, host, webview and repo
 npm run test:integration # build, then the extension in a real VS Code through @vscode/test-electron
 npm run fixtures         # build both fixture projects, so their launch configurations open with metadata
 npm run package          # vsce package
@@ -232,7 +267,7 @@ npm run package          # vsce package
 
 ### Tests
 
-Four Vitest projects: `core` (pure engine and parser, deliberately *without* a `vscode` alias), `builds` (real esbuild and Vite builds of the fixture projects in `src/test/fixtures/projects`, compared byte for byte with what the bundler reports, plus both plugins), `host` (a hand-written `vscode` mock) and `repo` (the manifest, the documentation, the exact contents of the VSIX and of both npm packages). The fixture projects carry hand-written packages for shared internals, tree shaking, side effects, two versions of one package, cycles and CommonJS. The integration tests open a built fixture in VS Code and check hints, hovers, diagnostics and commands.
+Five Vitest projects: `core` (pure engine and parser, deliberately *without* a `vscode` alias), `builds` (real esbuild and Vite builds of the fixture projects in `src/test/fixtures/projects`, compared byte for byte with what the bundler reports, plus both plugins), `host` (a hand-written `vscode` mock), `webview` (the dashboard in jsdom) and `repo` (the manifest, the documentation, the dashboard's page template, the exact contents of the VSIX and of both npm packages). The fixture projects carry hand-written packages for shared internals, tree shaking, side effects, two versions of one package, cycles and CommonJS. The integration tests open a built fixture in VS Code and check hints, hovers, diagnostics and commands.
 
 ### CI & Releases
 

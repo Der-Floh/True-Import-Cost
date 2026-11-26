@@ -1,6 +1,6 @@
 # Roadmap
 
-Each release produces something useful on its own. Version 0.1.0 covers the first three milestones.
+Each release produces something useful on its own. Version 0.1.0 covers the first four milestones.
 
 ## v0.1 — Core MVP ✅
 
@@ -31,14 +31,14 @@ Each release produces something useful on its own. Version 0.1.0 covers the firs
 - [x] Bundle Contents view
 - [x] Stale-result detection and last-good snapshots
 
-## v0.4 — Dashboard and comparisons
+## v0.4 — Dashboard and comparisons ✅
 
-- [ ] Vue webview dashboard with a treemap of the active target
-- [ ] Initial versus lazily loaded chunks, CSS, fonts, images and WebAssembly
-- [ ] Compare two builds of a target, and build size history
-- [ ] Compare build targets
-- [ ] Configurable size budgets
-- [ ] Navigate from a dependency to the imports that pull it in
+- [x] Vue webview dashboard with a treemap of the active target
+- [x] Initial versus lazily loaded chunks, CSS, fonts, images and WebAssembly
+- [x] Compare two builds of a target, and build size history
+- [x] Compare build targets
+- [x] Configurable size budgets
+- [x] Navigate from a dependency to the imports that pull it in
 
 ## v0.5 — Advanced cost analysis
 
