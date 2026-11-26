@@ -109,6 +109,12 @@ describe('the imports of App.vue against that build', () => {
         expect(cost.status === 'bundled' ? cost.match.confidence : undefined).toBe('resolved');
     });
 
+    it('traces a named import through the package barrel, resolving its re-exports by path', () => {
+        const cost = only(app, 'big-library');
+
+        expect(cost.status === 'bundled' ? cost.barrel?.definers : undefined).toEqual(['node_modules/big-library/lib/format.js', 'node_modules/big-library/lib/parse.js']);
+    });
+
     it('measures a package only App.vue imports as exclusive, without the export it does not use', () => {
         const cost = only(app, 'big-library');
         const validate = graph.bytesOf('node_modules/big-library/lib/validate.js');

@@ -12,7 +12,7 @@ interface CachedAnalysis {
     readonly analysis: Promise<DocumentAnalysis>;
 }
 
-const MAX_DOCUMENT_LENGTH = 2_000_000;
+export const MAX_DOCUMENT_LENGTH = 2_000_000;
 
 const EMPTY: DocumentAnalysis = { imports: [], usageAnalysed: false };
 

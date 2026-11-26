@@ -42,10 +42,10 @@ Each release produces something useful on its own. Version 0.1.0 covers the firs
 
 ## v0.5 — Advanced cost analysis
 
-- [ ] Usage-aware attribution through barrel modules (named import → the module that defines it)
-- [ ] Optional standalone size of a package
-- [ ] Compare two user-generated builds as a measured marginal cost
-- [ ] Automated counterfactual builds for safely identifiable cases, behind Workspace Trust and explicit consent
+- [x] Usage-aware attribution through barrel modules (named import → the module that defines it)
+- [x] Optional standalone size of a package
+- [x] Compare two user-generated builds as a measured marginal cost
+- [x] Automated counterfactual builds for safely identifiable cases, behind Workspace Trust and explicit consent
 - [ ] Webpack and Rspack adapters
 - [x] A CLI for CI pipelines (`@true-import-cost/cli`: summary, compare, budget check)
 

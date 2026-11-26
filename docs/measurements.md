@@ -20,6 +20,28 @@ Take an import edge from document **D** to module **M** in a build with entry po
 
 For a dynamic `import()` the edge itself is lazy, so its bundled bytes are what loads on demand.
 
+Named and default imports of a barrel are measured against the modules that define what they use instead of M: see [Imports through barrels](#imports-through-barrels).
+
+## Imports through barrels
+
+A barrel passes on what other modules define (`export { debounce } from './debounce.js'`, `export * from './forms'`), so M reaches every module it re-exports. For a named or default import of a barrel:
+
+| Measurement | Definition |
+| --- | --- |
+| Names | The bindings the import uses as values: called, read, passed on, or used in a Vue template. Type-only bindings never count. With `trueImportCost.analysis.usageAnalysis` off, every imported binding counts |
+| Defining modules | Where M's re-exports lead for each name: `export { … } from`, `export * as … from`, `export *`, and imports M only exports again, followed through nested barrels to the module that declares the name. Each re-export is resolved through the build's own import edges of the module that contains it. A module whose exports cannot be read ends the trace and counts in full, and so does the module an `export * as` names |
+| Bundled | Retained bytes of the barrels passed through, of everything they import for their own code (side-effect imports such as stylesheets, imports their own code uses, dynamic imports), and of every module reachable from the defining modules, as for any import |
+| Exclusive | Bundled bytes of the modules that are no longer reachable from E once the edges from D to M are removed, while every other import of the same barrel in D keeps what its own names need |
+| Shared | Bundled − exclusive |
+
+Modules a barrel only re-exports for names the import does not use are not charged to it, even when the build kept them for their side effects.
+
+Exclusive bytes are a lower bound. The build metadata does not record which exports each file uses, so another file that imports the same barrel counts as using all of it: once one does, everything the barrel reaches is shared. Removing the import could still free the modules only its names need.
+
+The cost stays at the module level, as defined above, for namespace, side-effect, dynamic, `require` and re-export imports; when M defines one of the names itself; when a re-export leads to a module the build left external or does not contain; when M's exports cannot be read because it is CommonJS, a Vue component, larger than 2 MB or has a syntax error; and when M imports a single module, and so does each module it leads to that way, so there is nothing to leave out. The hover says when an import was traced and names the defining modules.
+
+To trace an import, True Import Cost reads and parses the files of M and of the modules along its re-exports; it never runs them, and reads them again once the build metadata changes.
+
 ## Precision
 
 | Precision | Where it comes from | Marked |
@@ -35,7 +57,7 @@ A sum of modules is as precise as its least precise module.
 
 Bundlers report bytes per module, not per import statement or per function. Consequences:
 
-- A barrel module (`index.js` re-exporting everything) reaches every module of the package that the build kept, so two imports of different exports from the same barrel both count the package's retained modules. The exclusive and shared numbers stay correct for the module graph, and the hover's usage section shows what each import actually uses.
+- A barrel module (`index.js` re-exporting everything) reaches every module of the package that the build kept. Named imports are [traced through it](#imports-through-barrels) to the modules that define what they use, but a namespace import still counts everything the barrel reaches, and exclusive bytes count any other import of the same barrel as using all of it. A module the trace reaches counts in full, with every export it defines.
 - Exclusive bytes assume everything else stays as it is. Removing an import can change minification, constant folding, tree shaking and chunk boundaries, so the real difference of two builds can differ. [Measured costs](#measured-costs) are that difference.
 - Runtime helpers, module wrappers and chunk glue belong to no module; they count toward the totals in the status bar, not toward any import.
 

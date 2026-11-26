@@ -65,13 +65,16 @@ describe('the imports of src/extension.ts against that build', () => {
         expect(only(extension, 'vscode')).toMatchObject({ status: 'external' });
     });
 
-    it('measures a package barrel both extension.ts and commands.ts import as entirely shared', () => {
+    it('charges the exports extension.ts uses from a package barrel commands.ts imports too, all of them shared', () => {
         const cost = only(extension, 'big-library');
+        const used = ['index.js', 'lib/parse.js', 'lib/validate.js', 'lib/shared.js'].reduce((sum, file) => sum + bytesInOutput(`node_modules/big-library/${file}`), 0);
 
         expect(cost.status).toBe('bundled');
         if (cost.status === 'bundled') {
             expect(cost.match.confidence).toBe('exact');
-            expect(cost.impact.bundledBytes).toBe(cost.package?.bytes);
+            expect(cost.barrel?.definers).toEqual(['node_modules/big-library/lib/parse.js', 'node_modules/big-library/lib/validate.js']);
+            expect(cost.impact.bundledBytes).toBe(used);
+            expect(cost.package?.bytes).toBe(used + bytesInOutput('node_modules/big-library/lib/format.js'));
             expect(cost.impact.exclusiveBytes).toBe(0);
             expect(cost.impact.sharedBytes).toBe(cost.impact.bundledBytes);
         }

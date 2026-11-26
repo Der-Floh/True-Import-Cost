@@ -12,6 +12,7 @@ See what each import really costs **in your production build** — read from the
 - **Bundled, exclusive and shared, kept apart** — `12.4 kB bundled · 3.1 kB exclusive` says what an import pulls in and how much of it no other import reaches; `· shared` says the build keeps all of it for other imports anyway
 - **Honest about precision** — a `~` marks an estimate. The hover says whether sizes are reported by the bundler, estimated from source maps, rendered lengths, or rendered lengths scaled to the minified chunk
 - **Real shared-module analysis** — sharing comes from the module graph of the build, not from package names, so two imports of different exports from the same package are measured by the modules they actually reach
+- **Through barrel files** — `import { debounce } from 'lodash-es'` costs `debounce` and what it imports, not everything `lodash-es` re-exports: named imports are traced through `export … from` and `export *`, nested barrels included, to the modules that define the names you use, and the hover names them
 - **Separate build targets** — an extension host and a webview are separate builds, and a dependency in both is two costs, never one. Pick the target the hints measure against, or let each file use the target that contains it
 - **Usage-aware** — the hover lists what an import is used for: the members called or read, uses in a Vue template, and values that escape so the bundler may have to keep everything
 - **Removed and erased imports** — type-only imports, imports TypeScript drops because nothing uses them as values, tree-shaken modules and external modules each get their own label instead of a misleading size
@@ -27,7 +28,7 @@ See what each import really costs **in your production build** — read from the
 - **Measured marginal cost** — build the target once with and once without an import, or compare two builds of your own, and the hover shows exactly what the build saves without it
 - **Standalone size** — the imported names and the whole package bundled by themselves with your project's bundler, minified and gzipped
 - **CLI for CI** — [`@true-import-cost/cli`](packages/cli/README.md) prints a build's sizes and its largest and duplicate packages, compares two builds as a pull request comment, and fails the pipeline when a size budget is exceeded
-- **Local, and runs nothing unless you ask** — no network access, no telemetry. Hints, hovers and the dashboard only read build metadata, which is validated and size-limited, and nothing is written to the workspace. Measuring an import runs your build only when you ask, in a trusted workspace, after you allow the command
+- **Local, and runs nothing unless you ask** — no network access, no telemetry. Hints, hovers and the dashboard only read build metadata and source files, which are validated and size-limited, and nothing is written to the workspace. Measuring an import runs your build only when you ask, in a trusted workspace, after you allow the command
 
 ---
 
@@ -92,7 +93,7 @@ Hover an import for the full picture: the table below, the packages it pulls in,
 
 | Hint | Meaning |
 | --- | --- |
-| `12.4 kB bundled` | What the build kept of the imported module and everything it imports eagerly |
+| `12.4 kB bundled` | What the build kept of the imported module and everything it imports eagerly; for a named import of a barrel, of the modules that define the names it uses |
 | `· 3.1 kB exclusive` | The part of that no other import reaches. It would leave the build if this import did, as far as the module graph can tell |
 | `· shared` | Everything this import pulls in is also reached through other imports |
 | `~18 kB lazy` | A dynamic `import()`: the code loads on demand, in its own chunk where the bundler splits code |
@@ -109,8 +110,8 @@ Hover an import for the full picture: the table below, the packages it pulls in,
 
 | Measurement | What it is | Source |
 | --- | --- | --- |
-| Bundled | Retained bytes of the imported module and its eager imports | Build metadata and its module graph |
-| Exclusive | Bundled bytes no other path from an entry point reaches | Module graph with this import removed |
+| Bundled | Retained bytes of the imported module and its eager imports; for a named import of a barrel, of the modules that define what it uses | Build metadata and its module graph, and the barrel's source |
+| Exclusive | Bundled bytes no other path from an entry point reaches; a lower bound for a barrel other files import too | Module graph with this import removed |
 | Shared | Bundled bytes other imports reach as well | Module graph |
 | Lazy | Bytes behind dynamic imports | Module graph |
 | Whole package | Retained bytes of every module of the package instance | Build metadata |
@@ -118,7 +119,7 @@ Hover an import for the full picture: the table below, the packages it pulls in,
 | Measured | How much smaller the build is without the import | Two builds: with and without it |
 | Standalone | The imported names, and the whole package, bundled by themselves | Your project's esbuild or Rolldown |
 
-Attribution is per module: bundlers report what each **module** contributes, not what each import statement or function does, so a module that several imports reach counts toward each of them. Exclusive bytes assume the rest of the build stays as it is; removing an import can also change minification and chunking, which only a second build shows: see [Measuring an import](#measuring-an-import). [docs/measurements.md](docs/measurements.md) has the details.
+Named and default imports of a barrel are traced through its re-exports to the modules that define what they use; their exclusive bytes count other imports of the same barrel as using all of it. Attribution is per module: bundlers report what each **module** contributes, not what each import statement or function does, so a module that several imports reach counts toward each of them. Exclusive bytes assume the rest of the build stays as it is; removing an import can also change minification and chunking, which only a second build shows: see [Measuring an import](#measuring-an-import). [docs/measurements.md](docs/measurements.md) has the details.
 
 ### Measuring an import
 

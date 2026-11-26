@@ -80,19 +80,19 @@ describe('hovering a bundled import', () => {
         expect(markdown).toContain('Built just now');
     });
 
-    it('links to the explanation of why the package is included', async () => {
+    it('links to the explanation of why the package is included, and to its standalone size', async () => {
         const markdown = await hoverMarkdown(document, 'lodash');
 
-        expect(liveCommandLinks(markdown)).toEqual(['trueImportCost.explainWhyIncluded']);
+        expect(liveCommandLinks(markdown)).toEqual(['trueImportCost.explainWhyIncluded', 'trueImportCost.measureStandalone']);
         expect(commandLinkArguments(markdown, 'trueImportCost.explainWhyIncluded')).toEqual([
             { target: EXTENSION_HOST_KEY, packageRoot: 'node_modules/lodash', label: 'lodash' },
         ]);
     });
 
-    it('trusts only the explain command, and renders theme icons', async () => {
+    it('trusts only its own commands, which ask before they run anything, and renders theme icons', async () => {
         const markdown = markdownOf(await hoverAt(document, 'lodash'));
 
-        expect(markdown.isTrusted).toEqual({ enabledCommands: ['trueImportCost.explainWhyIncluded'] });
+        expect(markdown.isTrusted).toEqual({ enabledCommands: ['trueImportCost.explainWhyIncluded', 'trueImportCost.measureImport', 'trueImportCost.measureStandalone'] });
         expect(markdown.supportThemeIcons).toBe(true);
     });
 
@@ -233,11 +233,11 @@ describe('hovering an import of a package with a hostile name', () => {
         expect(title).toBe('**`x ](command:workbench.action.terminal.new)[y`** 1\\.0\\.0\\]\\(command:workbench\\.action\\.reloadWindow\\)');
     });
 
-    it('links to no command but the explain command', async () => {
+    it('links to no command but its own', async () => {
         const markdown = markdownOf(await hoverAt(document, 'evil'));
 
-        expect(liveCommandLinks(markdown.value)).toEqual(['trueImportCost.explainWhyIncluded']);
-        expect(markdown.isTrusted).toEqual({ enabledCommands: ['trueImportCost.explainWhyIncluded'] });
+        expect(liveCommandLinks(markdown.value)).toEqual(['trueImportCost.explainWhyIncluded', 'trueImportCost.measureStandalone']);
+        expect(markdown.isTrusted).toEqual({ enabledCommands: ['trueImportCost.explainWhyIncluded', 'trueImportCost.measureImport', 'trueImportCost.measureStandalone'] });
     });
 
     it('passes the name to the explain command intact', async () => {

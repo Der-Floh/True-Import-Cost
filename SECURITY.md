@@ -22,6 +22,7 @@ Build metadata is untrusted input:
 - Files larger than `trueImportCost.maxMetadataSizeMB` (64 MB by default) are rejected before they are read.
 - Contents are parsed as JSON only, read into maps rather than plain objects, and validated against a strict schema with limits on the number of modules, imports, chunks and the length of every string.
 - References between modules, imports and outputs are checked for consistency before the module graph is built. Graph traversals visit each module once, so cycles terminate.
+- To trace a named import through a barrel, the extension reads the barrel files along the import's re-exports that the metadata lists: JavaScript and TypeScript files up to 2 MB, parsed as text and never run. A file it cannot read or parse leaves the import's cost at the module level.
 - Text taken from metadata, such as package names and paths, is escaped before it appears in a hover. Hover command links are trusted for the extension's own *Explain Why Included* command only.
 - The dashboard is a webview whose content security policy allows only its own script, by nonce, and its own styles. It renders metadata as text, never as HTML, and every message it sends is checked against the message contract before the extension acts on it.
 - Stored baselines, and the snapshots a measured build writes, are validated like any other metadata; stored measurements are checked field by field when they are read back.

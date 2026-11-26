@@ -54,3 +54,19 @@ export interface DocumentAnalysis {
     readonly imports: readonly SourceImport[];
     readonly usageAnalysed: boolean;
 }
+
+export interface ReExport {
+    readonly name: string;
+    readonly imported: string;
+    readonly specifier: string;
+}
+
+export interface ModuleExports {
+    readonly kind: 'esm';
+    readonly local: readonly string[];
+    readonly reExports: readonly ReExport[];
+    readonly exportAll: readonly string[];
+    readonly ownImports: readonly string[];
+}
+
+export type ExportAnalysis = ModuleExports | { readonly kind: 'unknown' };

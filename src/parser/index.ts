@@ -1,9 +1,11 @@
+import { analyzeModuleExports } from './exports';
 import { analyzeScript } from './script';
 import { analyzeVue } from './vue';
 
-import type { AnalyzeOptions, DocumentAnalysis, ScriptLanguage } from './types';
+import type { AnalyzeOptions, DocumentAnalysis, ExportAnalysis, ScriptLanguage } from './types';
 
 export type { AnalyzeOptions, BindingUsage, DocumentAnalysis, MemberUsage, SourceImport, SourceImportKind, TextRange } from './types';
+export type { ExportAnalysis, ModuleExports, ReExport } from './types';
 export { planRemoval } from './removal';
 export type { PlannedRemoval } from './removal';
 
@@ -27,6 +29,8 @@ const EXTENSIONS: Readonly<Record<string, ScriptLanguage | 'vue'>> = {
     '.vue': 'vue',
 };
 
+const COMMONJS_FILE = /\.c[jt]s$/i;
+
 export function languageOf(languageId: string, fileName: string): ScriptLanguage | 'vue' | undefined {
     const byId = LANGUAGE_IDS[languageId];
     if (byId) {
@@ -49,4 +53,12 @@ export function analyzeDocument(languageId: string, fileName: string, text: stri
         ? analyzeVue(text, options)
         : analyzeScript(text, language, { usage: options.usage, elidesUnusedImports: language === 'ts' || language === 'tsx' });
     return { imports, usageAnalysed: options.usage };
+}
+
+export function analyzeExports(languageId: string, fileName: string, text: string): ExportAnalysis {
+    const language = languageOf(languageId, fileName);
+    if (language === undefined || language === 'vue' || COMMONJS_FILE.test(fileName)) {
+        return { kind: 'unknown' };
+    }
+    return analyzeModuleExports(text, language);
 }

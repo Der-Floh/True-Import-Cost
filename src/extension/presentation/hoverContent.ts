@@ -2,12 +2,15 @@ import * as vscode from 'vscode';
 
 import { inlineLabel, sizeText } from './labels';
 import { code, commandLink, escapeMarkdown } from './markdown';
+import { MEASUREMENT_COMMANDS, measurementActions, measurementLines } from './measurementContent';
+import { displayModulePath } from './modulePaths';
 import { Command } from '../constants';
 import { formatAge, formatBytes } from '../../core/format';
 
 import type { ImportCost, ModuleCost } from '../../core/attribution/attribute';
 import type { MatchConfidence } from '../../core/attribution/match';
 import type { MeasurementPrecision } from '../../core/schema/snapshot';
+import type { MeasurementHover } from './measurementContent';
 import type { BindingUsage } from '../../parser';
 import type { DocumentCosts, ImportCostEntry } from '../services/importCosts';
 import type { LoadedTarget } from '../services/metadataLoader';
@@ -24,6 +27,7 @@ export interface HoverInput {
     readonly others: readonly OtherTargetCost[];
     readonly display: DisplaySettings;
     readonly now: number;
+    readonly measurement?: MeasurementHover;
 }
 
 export interface ExplainArguments {
@@ -46,6 +50,8 @@ const CONFIDENCE_TEXT: Readonly<Record<MatchConfidence, string>> = {
     resolved: 'its resolved path in the build',
     heuristic: 'a path heuristic, as for an alias; it may be wrong',
 };
+
+const MAX_DEFINERS_SHOWN = 3;
 
 const STATUS_TEXT: Readonly<Record<Exclude<ImportCost['status'], 'bundled'>, string>> = {
     'tree-shaken': 'The build resolved this import but kept none of its code.',
@@ -102,6 +108,20 @@ function pullsIn(cost: ModuleCost): string | undefined {
     return others.length === 0 ? undefined : `Pulls in ${others.join(', ')}`;
 }
 
+function barrelText(target: LoadedTarget, cost: ModuleCost): string | undefined {
+    const trace = cost.barrel;
+    if (!trace) {
+        return undefined;
+    }
+    const name = (id: string): string => {
+        const module = target.graph.module(id);
+        return code(module === undefined ? id : displayModulePath(module));
+    };
+    const shown = trace.definers.slice(0, MAX_DEFINERS_SHOWN).map(name).join(', ');
+    const more = trace.definers.length - MAX_DEFINERS_SHOWN;
+    return `Traced through the barrel ${name(trace.moduleId)} to ${shown}${more > 0 ? ` and ${more} more` : ''}`;
+}
+
 function duplicateText(cost: ModuleCost): string | undefined {
     const duplicate = cost.duplicate;
     if (!duplicate) {
@@ -152,7 +172,7 @@ function explainArguments(target: LoadedTarget, cost: ModuleCost): ExplainArgume
 }
 
 export function hoverMarkdown(input: HoverInput): vscode.MarkdownString {
-    const { entry, costs, others, display, now } = input;
+    const { entry, costs, others, display, now, measurement = {} } = input;
     const { cost, source } = entry;
     const target = costs.target;
     const lines: string[] = [];
@@ -164,7 +184,7 @@ export function hoverMarkdown(input: HoverInput): vscode.MarkdownString {
     if (cost.status === 'bundled') {
         lines.push(...costTable(cost));
         lines.push('');
-        for (const extra of [pullsIn(cost), duplicateText(cost)]) {
+        for (const extra of [barrelText(target, cost), pullsIn(cost), duplicateText(cost)]) {
             if (extra !== undefined) {
                 lines.push(extra, '');
             }
@@ -189,6 +209,10 @@ export function hoverMarkdown(input: HoverInput): vscode.MarkdownString {
         }
     }
 
+    for (const line of measurementLines(measurement, now)) {
+        lines.push(line, '');
+    }
+
     const facts: string[] = [];
     if (cost.status === 'bundled' || cost.status === 'tree-shaken') {
         const precision = cost.impact.precision;
@@ -209,12 +233,16 @@ export function hoverMarkdown(input: HoverInput): vscode.MarkdownString {
         lines.push(`Other targets: ${otherLines.join(' · ')}`, '');
     }
 
-    if (cost.status === 'bundled' || cost.status === 'tree-shaken') {
-        lines.push(commandLink('Explain why included', Command.explainWhyIncluded, explainArguments(target, cost)));
+    const links = [
+        ...(cost.status === 'bundled' || cost.status === 'tree-shaken' ? [commandLink('Explain why included', Command.explainWhyIncluded, explainArguments(target, cost))] : []),
+        ...measurementActions(measurement),
+    ];
+    if (links.length > 0) {
+        lines.push(links.join(' · '));
     }
 
     const markdown = new vscode.MarkdownString(lines.join('\n'), true);
-    markdown.isTrusted = { enabledCommands: [Command.explainWhyIncluded] };
+    markdown.isTrusted = { enabledCommands: [Command.explainWhyIncluded, ...MEASUREMENT_COMMANDS] };
     return markdown;
 }
 

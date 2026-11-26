@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as vscode from 'vscode';
 
-import { activateExtension, settle } from './support/extension';
+import { activateExtension, commandLinkArguments, hoverAt, liveCommandLinks, markdownOf, settle } from './support/extension';
 import { esbuildMetafile, externalImport, staticImport } from './support/metafile';
 import { lines, writeJson, writeSource } from './support/workspace';
 import { normalizeEsbuildMetafile } from '../../core/adapters/esbuild';
@@ -352,5 +352,50 @@ describe('measuring the standalone size of a package', () => {
 
         expect(flushWarningMessages()).toEqual(['That build target is no longer loaded, or the import is not a package.']);
         expect(fake.standaloneJobs).toEqual([]);
+    });
+});
+
+describe('the hover of an import', () => {
+    async function hoverText(): Promise<string> {
+        return markdownOf(await hoverAt(source, "'lodash'")).value;
+    }
+
+    it('offers to measure it, by building without it and by itself', async () => {
+        const text = await hoverText();
+
+        expect(liveCommandLinks(text)).toEqual(['trueImportCost.explainWhyIncluded', 'trueImportCost.measureImport', 'trueImportCost.measureStandalone']);
+        expect(commandLinkArguments(text, 'trueImportCost.measureImport')).toEqual([{
+            target: KEY,
+            uri: vscode.Uri.file('/w/src/extension.ts').toString(),
+            specifier: 'lodash',
+            start: SOURCE.indexOf("import { chunk } from 'lodash';"),
+        }]);
+        expect(commandLinkArguments(text, 'trueImportCost.measureStandalone')).toEqual([{ target: KEY, specifier: 'lodash', names: ['chunk'] }]);
+        expect(markdownOf(await hoverAt(source, "'lodash'")).isTrusted).toEqual({
+            enabledCommands: ['trueImportCost.explainWhyIncluded', 'trueImportCost.measureImport', 'trueImportCost.measureStandalone'],
+        });
+    });
+
+    it('shows what building without it saved, and the standalone size, once measured', async () => {
+        await measure();
+        await vscode.commands.executeCommand('trueImportCost.measureStandalone', { target: KEY, specifier: 'lodash', names: ['chunk'] });
+        await settle();
+
+        const text = await hoverText();
+
+        expect(text).toContain('**Measured** · Built without this import, the build is **70 kB** smaller, all of it in the initial load · just now');
+        expect(text).toContain('**Standalone** · `{ chunk }` 2 kB (900 B gzipped), the whole package 70 kB (24 kB gzipped), bundled by itself with esbuild 0\\.28\\.2 for Node.js');
+        expect(text).toContain('[Measure again](command:trueImportCost.measureImport');
+        expect(text).toContain('[Measure standalone size again](command:trueImportCost.measureStandalone');
+    });
+
+    it('shows what was measured but offers nothing to run in Restricted Mode', async () => {
+        await measure();
+        setWorkspaceTrusted(false);
+
+        const text = await hoverText();
+
+        expect(text).toContain('**Measured** · Built without this import');
+        expect(liveCommandLinks(text)).toEqual(['trueImportCost.explainWhyIncluded']);
     });
 });

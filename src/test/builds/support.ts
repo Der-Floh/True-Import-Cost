@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as esbuild from 'esbuild';
@@ -6,18 +6,21 @@ import * as esbuild from 'esbuild';
 import { withPackageVersions } from '../../core/adapters/packageVersions';
 import { attributeImport, locateDocument } from '../../core/attribution/attribute';
 import { BuildGraph } from '../../core/graph/buildGraph';
-import { analyzeDocument } from '../../parser';
+import { analyzeDocument, analyzeExports } from '../../parser';
 import { toQuery } from '../../extension/services/importQuery';
 
 import type { ImportCost } from '../../core/attribution/attribute';
+import type { ExportResolver } from '../../core/attribution/barrels';
 import type { BuildSnapshot } from '../../core/schema/snapshot';
-import type { SourceImport } from '../../parser';
+import type { ExportAnalysis, SourceImport } from '../../parser';
 
 export const FIXTURES = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../fixtures/projects');
 
 export const ESBUILD_FIXTURE = path.join(FIXTURES, 'esbuild-node');
 
 export const VITE_FIXTURE = path.join(FIXTURES, 'vite-vue');
+
+export const BARRELS_FIXTURE = path.join(FIXTURES, 'esbuild-barrels');
 
 export interface AttributedImport {
     readonly source: SourceImport;
@@ -47,6 +50,23 @@ export async function buildEsbuildFixture(options: esbuild.BuildOptions = {}): P
 
 const LANGUAGES: Readonly<Record<string, string>> = { '.ts': 'typescript', '.js': 'javascript', '.vue': 'vue' };
 
+export function exportsOnDisk(graph: BuildGraph, fixture: string): ExportResolver {
+    const analyses = new Map<string, ExportAnalysis>();
+    return (moduleId) => {
+        const module = graph.module(moduleId);
+        const file = module === undefined || module.virtual === true ? undefined : path.join(fixture, module.path);
+        if (file === undefined || !existsSync(file)) {
+            return { kind: 'unknown' };
+        }
+        let analysis = analyses.get(file);
+        if (!analysis) {
+            analysis = analyzeExports('', file, readFileSync(file, 'utf8'));
+            analyses.set(file, analysis);
+        }
+        return analysis;
+    };
+}
+
 export function attributeFile(graph: BuildGraph, fixture: string, documentPath: string): Map<string, AttributedImport[]> {
     const text = readFileSync(path.join(fixture, documentPath), 'utf8');
     const languageId = LANGUAGES[path.extname(documentPath)] ?? 'typescript';
@@ -55,11 +75,13 @@ export function attributeFile(graph: BuildGraph, fixture: string, documentPath: 
     if (!location) {
         throw new Error(`${documentPath} is not part of the build`);
     }
+    const queries = analysis.imports.map(source => toQuery(source, analysis.usageAnalysed));
+    const barrels = { exportsOf: exportsOnDisk(graph, fixture), otherImports: queries };
     const bySpecifier = new Map<string, AttributedImport[]>();
-    for (const source of analysis.imports) {
-        const cost = attributeImport(location, toQuery(source));
+    analysis.imports.forEach((source, index) => {
+        const cost = attributeImport(location, queries[index]!, barrels);
         bySpecifier.set(source.specifier, [...(bySpecifier.get(source.specifier) ?? []), { source, cost }]);
-    }
+    });
     return bySpecifier;
 }
 

@@ -8,6 +8,8 @@ The first release. It covers milestones v0.1 to v0.5 of the [roadmap](docs/roadm
 
 ### Extension
 
+- Named and default imports of a barrel module are charged with the modules that define the names they use, instead of everything the barrel re-exports: `import { debounce } from 'lodash-es'` costs `debounce.js` and what it imports. The trace follows `export … from`, `export * as`, `export *` and imports that are only exported again, through nested barrels, resolves each re-export through the build's own module graph, and uses the names the import uses as values. What a barrel imports for itself, such as a stylesheet, still counts; CommonJS barrels keep their module-level cost
+- The hover says when an import was traced through a barrel and names the defining modules; exclusive bytes of a traced import are a lower bound while other files import the same barrel
 - Inline import costs read from build metadata: raw esbuild metafiles and True Import Cost snapshots, found in any `.true-import-cost` folder or listed in `trueImportCost.targets`
 - Bundled, exclusive, shared and lazy bytes per import, from the build's module graph; the whole package's size in the hover
 - External, tree-shaken, removed (unused), type-only and unrecorded imports each get their own label

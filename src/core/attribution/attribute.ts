@@ -1,11 +1,13 @@
+import { traceBarrel } from './barrels';
 import { matchImport } from './match';
 import { duplicateOf } from '../graph/duplicates';
-import { importImpact } from '../graph/impact';
+import { importImpact, scopedImpact, wholeModule } from '../graph/impact';
 
+import type { BarrelTrace, ExportResolver } from './barrels';
 import type { ImportMatch, MatchKindHint } from './match';
 import type { BuildGraph, PackageInstance } from '../graph/buildGraph';
 import type { DuplicatePackage } from '../graph/duplicates';
-import type { ImportImpact } from '../graph/impact';
+import type { ImportImpact, ImportScope } from '../graph/impact';
 import type { ModuleRecord } from '../schema/snapshot';
 
 export type ImportQueryKind = 'static' | 'dynamic' | 'require' | 're-export';
@@ -16,6 +18,12 @@ export interface ImportQuery {
     readonly typeOnly: boolean;
     readonly sideEffectOnly?: boolean;
     readonly hasValueUsage?: boolean;
+    readonly names?: readonly string[];
+}
+
+export interface BarrelContext {
+    readonly exportsOf: ExportResolver;
+    readonly otherImports?: readonly ImportQuery[];
 }
 
 export interface ModuleCost {
@@ -25,6 +33,7 @@ export interface ModuleCost {
     readonly lazy: boolean;
     readonly package?: PackageInstance;
     readonly duplicate?: DuplicatePackage;
+    readonly barrel?: BarrelTrace;
 }
 
 export type ImportCost =
@@ -58,7 +67,36 @@ function hintFor(kind: ImportQueryKind): MatchKindHint | undefined {
     }
 }
 
-export function attributeImport(location: DocumentLocation, query: ImportQuery): ImportCost {
+function traceQuery(graph: BuildGraph, moduleId: string, query: ImportQuery, exportsOf: ExportResolver): BarrelTrace | undefined {
+    return query.kind === 'static' && query.names !== undefined ? traceBarrel(graph, moduleId, query.names, exportsOf) : undefined;
+}
+
+function keptByOtherImports(location: DocumentLocation, query: ImportQuery, moduleId: string, barrels: BarrelContext): ImportScope[] {
+    const { graph, importerIds, documentPath } = location;
+    return (barrels.otherImports ?? []).flatMap((other) => {
+        if (other === query || other.typeOnly || other.hasValueUsage === false) {
+            return [];
+        }
+        const match = matchImport(graph, importerIds, documentPath, other.specifier, hintFor(other.kind));
+        if (match?.edge.resolvedModule !== moduleId) {
+            return [];
+        }
+        return [traceQuery(graph, moduleId, other, barrels.exportsOf) ?? wholeModule(moduleId)];
+    });
+}
+
+function measureImport(location: DocumentLocation, query: ImportQuery, moduleId: string, barrels: BarrelContext | undefined): { readonly impact: ImportImpact; readonly barrel?: BarrelTrace } {
+    const { graph, importerIds } = location;
+    if (barrels !== undefined) {
+        const barrel = traceQuery(graph, moduleId, query, barrels.exportsOf);
+        if (barrel !== undefined) {
+            return { impact: scopedImpact(graph, importerIds, barrel, keptByOtherImports(location, query, moduleId, barrels)), barrel };
+        }
+    }
+    return { impact: importImpact(graph, importerIds, moduleId) };
+}
+
+export function attributeImport(location: DocumentLocation, query: ImportQuery, barrels?: BarrelContext): ImportCost {
     if (query.typeOnly) {
         return { status: 'type-only' };
     }
@@ -81,7 +119,7 @@ export function attributeImport(location: DocumentLocation, query: ImportQuery):
     if (!module) {
         return { status: 'unresolved' };
     }
-    const impact = importImpact(graph, importerIds, module.id);
+    const { impact, barrel } = measureImport(location, query, module.id, barrels);
     const instance = graph.packageOf(module.id);
     const duplicate = instance === undefined ? undefined : duplicateOf(graph, instance.name);
     const cost: ModuleCost = {
@@ -91,6 +129,7 @@ export function attributeImport(location: DocumentLocation, query: ImportQuery):
         lazy: edge.kind === 'dynamic',
         ...(instance === undefined ? {} : { package: instance }),
         ...(duplicate === undefined ? {} : { duplicate }),
+        ...(barrel === undefined ? {} : { barrel }),
     };
     return impact.bundledBytes + impact.lazyBytes > 0
         ? { status: 'bundled', ...cost }

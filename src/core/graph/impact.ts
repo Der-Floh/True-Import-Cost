@@ -24,6 +24,13 @@ export interface ImportImpact {
     readonly packages: readonly PackageShare[];
 }
 
+export interface ImportScope {
+    readonly moduleId: string;
+    readonly passThrough: readonly string[];
+    readonly eagerRoots: readonly string[];
+    readonly lazyRoots: readonly string[];
+}
+
 const cache = new WeakMap<BuildGraph, Map<string, ImportImpact>>();
 
 function cacheFor(graph: BuildGraph): Map<string, ImportImpact> {
@@ -35,19 +42,23 @@ function cacheFor(graph: BuildGraph): Map<string, ImportImpact> {
     return map;
 }
 
-export function importImpact(graph: BuildGraph, importerIds: readonly string[], moduleId: string): ImportImpact {
-    const key = `${[...importerIds].sort().join('\u0001')}\u0002${moduleId}`;
-    const cached = cacheFor(graph).get(key);
-    if (cached) {
-        return cached;
+function cached(graph: BuildGraph, key: string, compute: () => ImportImpact): ImportImpact {
+    const map = cacheFor(graph);
+    let impact = map.get(key);
+    if (!impact) {
+        impact = compute();
+        map.set(key, impact);
     }
+    return impact;
+}
 
+function restOfBuild(graph: BuildGraph, importerIds: readonly string[], moduleId: string): Set<string> {
     const importers = new Set(importerIds);
-    const eager = reachableFrom(graph, [moduleId], followsEagerly);
-    const all = reachableFrom(graph, [moduleId], followsInclusion);
-    const rest = reachableFrom(graph, graph.entries, edge =>
+    return reachableFrom(graph, graph.entries, edge =>
         followsInclusion(edge) && !(edge.resolvedModule === moduleId && importers.has(edge.importer)));
+}
 
+function summarize(graph: BuildGraph, moduleId: string, eager: ReadonlySet<string>, all: ReadonlySet<string>, rest: ReadonlySet<string>): ImportImpact {
     let bundledBytes = 0;
     let exclusiveBytes = 0;
     let retainedModuleCount = 0;
@@ -92,7 +103,7 @@ export function importImpact(graph: BuildGraph, importerIds: readonly string[], 
         }
     }
 
-    const impact: ImportImpact = {
+    return {
         moduleId,
         bundledBytes,
         lazyBytes,
@@ -104,6 +115,44 @@ export function importImpact(graph: BuildGraph, importerIds: readonly string[], 
         ...(precision === undefined ? {} : { precision }),
         packages: [...shares.values()].sort((a, b) => b.bytes - a.bytes),
     };
-    cacheFor(graph).set(key, impact);
-    return impact;
+}
+
+export function importImpact(graph: BuildGraph, importerIds: readonly string[], moduleId: string): ImportImpact {
+    const key = `${[...importerIds].sort().join('\u0001')}\u0002${moduleId}`;
+    return cached(graph, key, () => summarize(
+        graph,
+        moduleId,
+        reachableFrom(graph, [moduleId], followsEagerly),
+        reachableFrom(graph, [moduleId], followsInclusion),
+        restOfBuild(graph, importerIds, moduleId),
+    ));
+}
+
+export function wholeModule(moduleId: string): ImportScope {
+    return { moduleId, passThrough: [], eagerRoots: [moduleId], lazyRoots: [] };
+}
+
+function scopeKey(scope: ImportScope): string {
+    return [scope.moduleId, ...[scope.passThrough, scope.eagerRoots, scope.lazyRoots].map(ids => [...ids].sort().join('\u0001'))].join('\u0002');
+}
+
+function eagerModules(graph: BuildGraph, scope: ImportScope): Set<string> {
+    return new Set([...scope.passThrough, ...reachableFrom(graph, scope.eagerRoots, followsEagerly)]);
+}
+
+function includedModules(graph: BuildGraph, scope: ImportScope): Set<string> {
+    return new Set([...scope.passThrough, ...reachableFrom(graph, [...scope.eagerRoots, ...scope.lazyRoots], followsInclusion)]);
+}
+
+export function scopedImpact(graph: BuildGraph, importerIds: readonly string[], scope: ImportScope, alsoKept: readonly ImportScope[] = []): ImportImpact {
+    const key = `scoped\u0003${[...importerIds].sort().join('\u0001')}\u0003${scopeKey(scope)}\u0003${alsoKept.map(scopeKey).sort().join('\u0004')}`;
+    return cached(graph, key, () => {
+        const rest = restOfBuild(graph, importerIds, scope.moduleId);
+        for (const kept of alsoKept) {
+            for (const id of includedModules(graph, kept)) {
+                rest.add(id);
+            }
+        }
+        return summarize(graph, scope.moduleId, eagerModules(graph, scope), includedModules(graph, scope), rest);
+    });
 }

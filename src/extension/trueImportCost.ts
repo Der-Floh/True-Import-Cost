@@ -108,6 +108,7 @@ export class TrueImportCost implements vscode.Disposable {
             selection,
             this.analyzer,
             this.staleness,
+            this.service,
             this.inlayHints,
             this.diagnostics,
             this.statusBar,
@@ -123,7 +124,7 @@ export class TrueImportCost implements vscode.Disposable {
             standalone,
             this.dashboard,
             vscode.languages.registerInlayHintsProvider(DOCUMENT_SELECTOR, this.inlayHints),
-            vscode.languages.registerHoverProvider(DOCUMENT_SELECTOR, new ImportCostHover(this.service, settings)),
+            vscode.languages.registerHoverProvider(DOCUMENT_SELECTOR, new ImportCostHover(this.service, settings, { measurements: this.measurements, standaloneSizes: this.standaloneSizes })),
             vscode.languages.registerCodeActionsProvider(DOCUMENT_SELECTOR, new DuplicatePackageQuickFix(this.service), {
                 providedCodeActionKinds: DuplicatePackageQuickFix.kinds,
             }),

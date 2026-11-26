@@ -1,3 +1,4 @@
+import { BarrelExports } from './barrelExports';
 import { toQuery } from './importQuery';
 import { documentPathIn } from './snapshotStore';
 import { attributeImport, locateDocument } from '../../core/attribution/attribute';
@@ -7,7 +8,7 @@ import type { LoadedTarget } from './metadataLoader';
 import type { SnapshotStore } from './snapshotStore';
 import type { StalenessTracker } from './staleness';
 import type { TargetSelection } from './targetSelection';
-import type { ImportCost } from '../../core/attribution/attribute';
+import type { DocumentLocation, ImportCost, ImportQuery } from '../../core/attribution/attribute';
 import type { DocumentAnalysis, SourceImport } from '../../parser';
 import type * as vscode from 'vscode';
 
@@ -26,17 +27,22 @@ export interface DocumentCosts {
     readonly stale: boolean;
 }
 
-export class ImportCostService {
+const MAX_LOAD_ROUNDS = 16;
+
+export class ImportCostService implements vscode.Disposable {
     private readonly store: SnapshotStore;
     private readonly selection: TargetSelection;
     private readonly analyzer: DocumentAnalyzer;
     private readonly staleness: StalenessTracker;
+    private readonly barrels = new BarrelExports();
+    private readonly subscription: vscode.Disposable;
 
     public constructor(store: SnapshotStore, selection: TargetSelection, analyzer: DocumentAnalyzer, staleness: StalenessTracker) {
         this.store = store;
         this.selection = selection;
         this.analyzer = analyzer;
         this.staleness = staleness;
+        this.subscription = store.onDidChange(() => this.barrels.clear());
     }
 
     public targetsFor(document: vscode.TextDocument): LoadedTarget[] {
@@ -52,9 +58,25 @@ export class ImportCostService {
     }
 
     public costIn(target: LoadedTarget, documentUri: vscode.Uri, source: SourceImport): ImportCost | undefined {
-        const path = documentPathIn(target.baseUri, documentUri);
-        const location = path === undefined ? undefined : locateDocument(target.graph, path);
-        return location === undefined ? undefined : attributeImport(location, toQuery(source));
+        const location = this.locate(target, documentUri);
+        return location === undefined ? undefined : attributeImport(location, toQuery(source), { exportsOf: this.barrels.resolver(target) });
+    }
+
+    public async costsIn(target: LoadedTarget, documentUri: vscode.Uri, analysis: DocumentAnalysis, token?: vscode.CancellationToken): Promise<(ImportCost | undefined)[]> {
+        const location = this.locate(target, documentUri);
+        if (location === undefined) {
+            return analysis.imports.map(() => undefined);
+        }
+        const queries = analysis.imports.map(source => toQuery(source, analysis.usageAnalysed));
+        for (let round = 0; round < MAX_LOAD_ROUNDS && token?.isCancellationRequested !== true; round++) {
+            const missing = new Set<string>();
+            const costs = this.attributeAll(target, location, queries, missing);
+            if (missing.size === 0) {
+                return costs;
+            }
+            await this.barrels.load(target, missing);
+        }
+        return this.attributeAll(target, location, queries);
     }
 
     public async costsFor(document: vscode.TextDocument, token: vscode.CancellationToken): Promise<DocumentCosts | undefined> {
@@ -68,13 +90,11 @@ export class ImportCostService {
             return undefined;
         }
         const stale = await this.staleness.isStale(document, target);
-        const entries: ImportCostEntry[] = [];
-        for (const source of analysis.imports) {
-            const cost = this.costIn(target, document.uri, source);
-            if (cost) {
-                entries.push({ source, cost });
-            }
-        }
+        const costs = await this.costsIn(target, document.uri, analysis, token);
+        const entries = analysis.imports.flatMap((source, index): ImportCostEntry[] => {
+            const cost = costs[index];
+            return cost === undefined ? [] : [{ source, cost }];
+        });
         return {
             target,
             otherTargets: candidates.filter(candidate => candidate !== target),
@@ -87,5 +107,20 @@ export class ImportCostService {
     public clear(): void {
         this.analyzer.clear();
         this.staleness.clear();
+        this.barrels.clear();
+    }
+
+    public dispose(): void {
+        this.subscription.dispose();
+    }
+
+    private locate(target: LoadedTarget, documentUri: vscode.Uri): DocumentLocation | undefined {
+        const path = documentPathIn(target.baseUri, documentUri);
+        return path === undefined ? undefined : locateDocument(target.graph, path);
+    }
+
+    private attributeAll(target: LoadedTarget, location: DocumentLocation, queries: readonly ImportQuery[], missing?: Set<string>): ImportCost[] {
+        const exportsOf = this.barrels.resolver(target, missing);
+        return queries.map(query => attributeImport(location, query, { exportsOf, otherImports: queries }));
     }
 }

@@ -63,7 +63,11 @@ const COMPILER_OPTIONS: ts.CompilerOptions = {
 
 const MEMBER_KIND_RANK: Readonly<Record<MemberUsageKind, number>> = { call: 3, construct: 2, access: 1, destructure: 0 };
 
-function createChecker(sourceFile: ts.SourceFile): ts.TypeChecker {
+export function parseScript(text: string, language: ScriptLanguage): ts.SourceFile {
+    return ts.createSourceFile(FILE_NAMES[language], text, ts.ScriptTarget.Latest, true, SCRIPT_KINDS[language]);
+}
+
+export function singleFileProgram(sourceFile: ts.SourceFile): ts.Program {
     const host: ts.CompilerHost = {
         getSourceFile: fileName => (fileName === sourceFile.fileName ? sourceFile : undefined),
         getDefaultLibFileName: () => '/lib.d.ts',
@@ -75,7 +79,11 @@ function createChecker(sourceFile: ts.SourceFile): ts.TypeChecker {
         fileExists: fileName => fileName === sourceFile.fileName,
         readFile: () => undefined,
     };
-    return ts.createProgram({ rootNames: [sourceFile.fileName], options: COMPILER_OPTIONS, host }).getTypeChecker();
+    return ts.createProgram({ rootNames: [sourceFile.fileName], options: COMPILER_OPTIONS, host });
+}
+
+function createChecker(sourceFile: ts.SourceFile): ts.TypeChecker {
+    return singleFileProgram(sourceFile).getTypeChecker();
 }
 
 function nameText(name: ts.ModuleExportName | ts.PropertyName): string | undefined {
@@ -85,7 +93,7 @@ function nameText(name: ts.ModuleExportName | ts.PropertyName): string | undefin
     return undefined;
 }
 
-function stringArgument(node: ts.CallExpression): ts.StringLiteral | ts.NoSubstitutionTemplateLiteral | undefined {
+export function stringArgument(node: ts.CallExpression): ts.StringLiteral | ts.NoSubstitutionTemplateLiteral | undefined {
     const argument = node.arguments[0];
     return argument !== undefined && (ts.isStringLiteral(argument) || ts.isNoSubstitutionTemplateLiteral(argument)) ? argument : undefined;
 }
@@ -237,7 +245,7 @@ function isTypeHeritage(node: ts.ExpressionWithTypeArguments): boolean {
     return clause.token === ts.SyntaxKind.ImplementsKeyword || ts.isInterfaceDeclaration(clause.parent);
 }
 
-function isInTypePosition(identifier: ts.Identifier): boolean {
+export function isInTypePosition(identifier: ts.Identifier): boolean {
     let node: ts.Node = identifier;
     while (node.parent) {
         const parent: ts.Node = node.parent;
@@ -401,7 +409,7 @@ const VALUE_KINDS: ReadonlySet<SourceImportKind> = new Set(['default', 'named', 
 
 export function analyzeScript(text: string, language: ScriptLanguage, options: ScriptOptions): SourceImport[] {
     const offset = options.offset ?? 0;
-    const sourceFile = ts.createSourceFile(FILE_NAMES[language], text, ts.ScriptTarget.Latest, true, SCRIPT_KINDS[language]);
+    const sourceFile = parseScript(text, language);
     let checker: ts.TypeChecker | undefined;
     const lazyChecker = (): ts.TypeChecker => (checker ??= createChecker(sourceFile));
     const pending = collectImports(sourceFile, lazyChecker);
