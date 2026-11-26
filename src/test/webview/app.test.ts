@@ -39,8 +39,9 @@ describe('without build metadata', () => {
         const wrapper = await mountDashboard(modelWithoutTarget());
 
         expect(wrapper.find('h1').text()).toBe('No build metadata yet');
-        expect(wrapper.text()).toContain('Write an esbuild metafile into a .true-import-cost folder');
+        expect(wrapper.text()).toContain('Write an esbuild metafile or webpack stats into a .true-import-cost folder');
         expect(wrapper.text()).toContain('@true-import-cost/vite');
+        expect(wrapper.text()).toContain('@true-import-cost/webpack');
         expect(wrapper.find('main').attributes('aria-busy')).toBe('false');
     });
 

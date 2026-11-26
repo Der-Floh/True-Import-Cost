@@ -8,7 +8,7 @@ See what each import really costs **in your production build** — read from the
 
 ## ✨ Features
 
-- **Production-aware sizes** — module sizes come from your bundler: esbuild's `bytesInOutput`, or what Vite, Rollup or Rolldown rendered into each chunk. Hints and hovers are read from your build's metadata, never from a bundler run of their own
+- **Production-aware sizes** — module sizes come from your bundler: esbuild's `bytesInOutput`, what Vite, Rollup or Rolldown rendered into each chunk, or webpack's and Rspack's module sizes scaled to the minified files. Hints and hovers are read from your build's metadata, never from a bundler run of their own
 - **Bundled, exclusive and shared, kept apart** — `12.4 kB bundled · 3.1 kB exclusive` says what an import pulls in and how much of it no other import reaches; `· shared` says the build keeps all of it for other imports anyway
 - **Honest about precision** — a `~` marks an estimate. The hover says whether sizes are reported by the bundler, estimated from source maps, rendered lengths, or rendered lengths scaled to the minified chunk
 - **Real shared-module analysis** — sharing comes from the module graph of the build, not from package names, so two imports of different exports from the same package are measured by the modules they actually reach
@@ -74,7 +74,21 @@ export default defineConfig({
 });
 ```
 
-A metafile that already lives somewhere else can be added with **Import Build Metadata**, or listed in `trueImportCost.targets`.
+**webpack and Rspack** — add [`@true-import-cost/webpack`](packages/webpack/README.md). It writes a snapshot after every build, with module sizes estimated from the minified files (from their source maps when `devtool` writes them), the bundler version, the build mode and the package versions. Rspack runs it unchanged:
+
+```js
+// webpack.config.js or rspack.config.js
+const { TrueImportCostPlugin } = require('@true-import-cost/webpack');
+
+module.exports = {
+    // …
+    plugins: [new TrueImportCostPlugin({ target: 'extension-host' })],
+};
+```
+
+Raw stats work too: `webpack --json=.true-import-cost/extension-host.json`, or `stats.toJson({ all: true })` written to that folder for Rspack.
+
+A metafile or stats file that already lives somewhere else can be added with **Import Build Metadata**, or listed in `trueImportCost.targets`.
 
 ### 2. Open a source file
 
@@ -173,7 +187,7 @@ Every metadata file is one build target, named after its `target` (snapshots), i
 | Command | What it does |
 | --- | --- |
 | **True Import Cost: Select Build Target** | Choose the build target the hints, views and status bar measure against |
-| **True Import Cost: Import Build Metadata** | Pick an esbuild metafile or a snapshot anywhere, check it, and add it to `trueImportCost.targets` |
+| **True Import Cost: Import Build Metadata** | Pick an esbuild metafile, webpack or Rspack stats, or a snapshot anywhere, check it, and add it to `trueImportCost.targets` |
 | **True Import Cost: Refresh Analysis** | Look for metadata again and read every file anew |
 | **True Import Cost: Explain Why Included** | Show the import chains that pull a module or package into the build — for the import under the cursor, or one you pick |
 | **True Import Cost: Toggle Inline Hints** | Turn the inline hints on or off (`trueImportCost.inlayHints.enabled`) |
@@ -223,7 +237,7 @@ An entry of `trueImportCost.targets`:
 }
 ```
 
-`root` is only needed for a raw esbuild metafile whose paths are relative to a directory True Import Cost cannot work out: by default it tries the metafile's folder and each folder above it, up to the workspace folder, until the paths in the metafile exist.
+`root` is only needed for a raw esbuild metafile or raw webpack stats whose paths are relative to a directory True Import Cost cannot work out: by default it tries the metafile's folder and each folder above it, up to the workspace folder, until the paths in the metafile exist.
 
 In Restricted Mode the workspace's own `trueImportCost.targets`, `trueImportCost.maxMetadataSizeMB` and `trueImportCost.measure.command` are ignored, and measuring imports, which runs the workspace's build or bundler, is not available; metadata in `.true-import-cost` folders is still read.
 
@@ -255,6 +269,10 @@ npm install --save-dev @true-import-cost/vite
 npm install --save-dev @true-import-cost/esbuild
 ```
 
+```bash
+npm install --save-dev @true-import-cost/webpack
+```
+
 So is the CLI for CI pipelines:
 
 ```bash
@@ -281,7 +299,7 @@ Bug reports and feature requests are welcome via [Issues](https://github.com/Der
 | Parser | `src/parser` | Import extraction and symbol-based usage analysis with the TypeScript compiler API, and Vue single-file components through `@vue/compiler-dom`. Bundled separately and loaded on first use, so activation does not pay for TypeScript |
 | Extension | `src/extension` | Finding, reading and watching metadata, build targets, inlay hints, hovers, diagnostics, views, commands, baselines and history |
 | Dashboard | `src/webview`, `src/shared` | Vue 3 webview built with Vite into one script, talking to the host only through the message contract in `src/shared` |
-| Bundler plugins | `src/plugins`, published from `packages/` | `@true-import-cost/esbuild` and `@true-import-cost/vite`, built from the same core sources |
+| Bundler plugins | `src/plugins`, published from `packages/` | `@true-import-cost/esbuild`, `@true-import-cost/vite` and `@true-import-cost/webpack`, built from the same core sources |
 | CLI | `src/cli`, published from `packages/cli` | `true-import-cost summary`, `compare` and `check` for CI pipelines, on the same core |
 
 [docs/architecture.md](docs/architecture.md) explains the data flow, [docs/snapshot-schema.md](docs/snapshot-schema.md) the metadata format and [docs/roadmap.md](docs/roadmap.md) what comes next.

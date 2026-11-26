@@ -1,6 +1,6 @@
 # Snapshot format
 
-A True Import Cost snapshot is one JSON file per build target, normally in a `.true-import-cost` folder. The bundler plugins write it; the extension also accepts a raw esbuild metafile and converts it to this format on read. The TypeScript definition is `src/core/schema/snapshot.ts`, the validation `src/core/schema/validate.ts`.
+A True Import Cost snapshot is one JSON file per build target, normally in a `.true-import-cost` folder. The bundler plugins write it; the extension also accepts a raw esbuild metafile or webpack and Rspack stats, and converts them to this format on read. The TypeScript definition is `src/core/schema/snapshot.ts`, the validation `src/core/schema/validate.ts`.
 
 ```jsonc
 {
@@ -55,12 +55,12 @@ A True Import Cost snapshot is one JSON file per build target, normally in a `.t
 | `format`, `schemaVersion` | Always `true-import-cost/build-snapshot` and `1`. A reader rejects any other version |
 | `target` | Name of the build target |
 | `createdAt` | When the build finished, in milliseconds since the epoch. Used to detect stale results |
-| `bundler` | Name and version of the bundler, and the engine underneath (Vite on Rollup or Rolldown) |
+| `bundler` | Name and version of the bundler (`esbuild`, `vite`, `webpack` or `rspack`), and the engine underneath (Vite on Rollup or Rolldown) |
 | `mode` | `production` or `development`, when known |
 | `root` | Directory every module path is relative to, relative to the snapshot file's own folder |
-| `modules[].id` | Unique id: the path, plus the query of a virtual sub-module (`App.vue?vue&type=style&index=0&lang.css`), or the bundler's id for a module without a file |
+| `modules[].id` | Unique id: the path, plus the query of a virtual sub-module (`App.vue?vue&type=style&index=0&lang.css`), or the bundler's id for a module without a file. When webpack builds two modules from one file and query, such as a stylesheet and the CSS a plugin extracts from it, the second id ends in its module type (`src/style.css|css/mini-extract`) |
 | `modules[].path` | The file the module comes from, without the query |
-| `modules[].virtual` | The module has no file of its own, such as a bundler helper |
+| `modules[].virtual` | The module has no file of its own, such as a bundler helper or webpack's runtime (`webpack/runtime/…`) |
 | `modules[].entry` | The module is an entry point of the build |
 | `modules[].package*` | Package name, version and install root, for modules under `node_modules`. Two install roots are two package instances |
 | `modules[].contributions` | Bytes the module contributes to each chunk or asset, with their precision. No contribution means the build retained nothing of it |

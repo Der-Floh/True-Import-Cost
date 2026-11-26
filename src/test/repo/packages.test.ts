@@ -25,8 +25,9 @@ interface PackedFile {
 
 const ROOT = process.cwd();
 const PACKAGES = [
-    { directory: 'packages/esbuild', name: '@true-import-cost/esbuild', peer: 'esbuild' },
-    { directory: 'packages/vite', name: '@true-import-cost/vite', peer: 'vite' },
+    { directory: 'packages/esbuild', name: '@true-import-cost/esbuild', peers: ['esbuild'], typesFrom: ['esbuild'], extraFiles: [] },
+    { directory: 'packages/vite', name: '@true-import-cost/vite', peers: ['vite'], typesFrom: ['vite'], extraFiles: [] },
+    { directory: 'packages/webpack', name: '@true-import-cost/webpack', peers: ['@rspack/core', 'webpack'], typesFrom: [], extraFiles: ['dist/webpackLoader.cjs'] },
 ] as const;
 
 const require = createRequire(import.meta.url);
@@ -45,7 +46,7 @@ function exportTargets(value: unknown): string[] {
     return [];
 }
 
-describe.each(PACKAGES)('the $name package', ({ directory, name, peer }) => {
+describe.each(PACKAGES)('the $name package', ({ directory, name, peers, typesFrom, extraFiles }) => {
     const manifest = manifestOf(directory);
 
     it('is public, MIT licensed and has no runtime dependencies', () => {
@@ -54,7 +55,7 @@ describe.each(PACKAGES)('the $name package', ({ directory, name, peer }) => {
         expect(manifest.license).toBe('MIT');
         expect(manifest.publishConfig?.access).toBe('public');
         expect(manifest.dependencies ?? {}).toEqual({});
-        expect(Object.keys(manifest.peerDependencies)).toEqual([peer]);
+        expect(Object.keys(manifest.peerDependencies).sort()).toEqual(peers);
     });
 
     it('carries the repository licence unchanged', () => {
@@ -75,7 +76,7 @@ describe.each(PACKAGES)('the $name package', ({ directory, name, peer }) => {
         const [packed] = JSON.parse(output) as { files: PackedFile[] }[];
         const files = (packed?.files ?? []).map(file => file.path).sort();
 
-        expect(files).toEqual(['LICENSE', 'README.md', 'dist/index.cjs', 'dist/index.d.cts', 'dist/index.d.mts', 'dist/index.mjs', 'package.json']);
+        expect(files).toEqual(['LICENSE', 'README.md', 'dist/index.cjs', 'dist/index.d.cts', 'dist/index.d.mts', 'dist/index.mjs', ...extraFiles, 'package.json'].sort());
     }, 60_000);
 
     it('loads from CommonJS and from ES modules', async () => {
@@ -87,12 +88,11 @@ describe.each(PACKAGES)('the $name package', ({ directory, name, peer }) => {
         expect(fromImport.default).toBe(fromImport.trueImportCost);
     });
 
-    it('declares its options without referring to files that are not published', () => {
+    it('declares its options, importing types from its bundler at most', () => {
         const declaration = readFileSync(path.join(ROOT, directory, 'dist/index.d.mts'), 'utf8');
 
         expect(declaration).toContain('export interface TrueImportCostOptions');
-        expect(declaration).toContain(`from '${peer}'`);
-        expect(declaration).not.toMatch(/from ['"]\.\.?\//);
+        expect([...declaration.matchAll(/from ['"]([^'"]+)['"]/g)].map(match => match[1])).toEqual(typesFrom);
     });
 });
 

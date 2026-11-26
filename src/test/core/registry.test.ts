@@ -124,7 +124,7 @@ describe('snapshotAdapter', () => {
 });
 
 describe('BUILTIN_ADAPTERS', () => {
-    it('tries snapshots first, then esbuild, then rollup', () => {
-        expect(BUILTIN_ADAPTERS.map(each => each.name)).toEqual(['snapshot', 'esbuild', 'rollup']);
+    it('tries snapshots first, then esbuild, then rollup, then webpack', () => {
+        expect(BUILTIN_ADAPTERS.map(each => each.name)).toEqual(['snapshot', 'esbuild', 'rollup', 'webpack']);
     });
 });

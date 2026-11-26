@@ -8,6 +8,7 @@ The first release. It covers milestones v0.1 to v0.5 of the [roadmap](docs/roadm
 
 ### Extension
 
+- webpack 5 and Rspack stats JSON (`stats.toJson()`, `webpack --json`) are read like esbuild metafiles: modules by path, including those inside concatenated modules, chunks and assets, imports from each module's reasons, externals and package versions. Module sizes are scaled to the minified files. Stats without modules, chunks, assets or reasons are rejected with a message that says how to write them
 - Named and default imports of a barrel module are charged with the modules that define the names they use, instead of everything the barrel re-exports: `import { debounce } from 'lodash-es'` costs `debounce.js` and what it imports. The trace follows `export … from`, `export * as`, `export *` and imports that are only exported again, through nested barrels, resolves each re-export through the build's own module graph, and uses the names the import uses as values. What a barrel imports for itself, such as a stylesheet, still counts; CommonJS barrels keep their module-level cost
 - The hover says when an import was traced through a barrel and names the defining modules; exclusive bytes of a traced import are a lower bound while other files import the same barrel
 - Inline import costs read from build metadata: raw esbuild metafiles and True Import Cost snapshots, found in any `.true-import-cost` folder or listed in `trueImportCost.targets`
@@ -43,6 +44,11 @@ The first release. It covers milestones v0.1 to v0.5 of the [roadmap](docs/roadm
 - Per-module sizes from rendered lengths scaled to the minified chunk, or from the source maps when the build writes them
 - CSS split across the stylesheets and Vue style blocks that produced it; emitted assets attributed to the modules they came from
 - Measurement mode for True Import Cost's measured costs: with `TRUE_IMPORT_COST_MEASURE` set, takes one import out of a file in memory, writes no output, and puts its snapshot in a temporary folder
+
+### `@true-import-cost/webpack` 0.1.0
+
+- New plugin for webpack 5 and Rspack 1 and 2: writes a True Import Cost snapshot after every successful build, with per-module sizes from the source maps when the build writes them
+- Measurement mode for True Import Cost's measured costs: with `TRUE_IMPORT_COST_MEASURE` set, a loader takes one import out of a file in memory, and nothing is emitted or cleaned
 
 ### `@true-import-cost/cli` 0.1.0
 

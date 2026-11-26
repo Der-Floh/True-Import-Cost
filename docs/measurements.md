@@ -46,12 +46,14 @@ To trace an import, True Import Cost reads and parses the files of M and of the 
 
 | Precision | Where it comes from | Marked |
 | --- | --- | --- |
-| Reported by the bundler | esbuild's `bytesInOutput` for each input of each output | no |
+| Reported by the bundler | esbuild's `bytesInOutput` for each input of each output; the size of a file emitted for one module, such as an image | no |
 | Source-map estimate | Bytes of the minified chunk that its source map attributes to each source | `~` |
-| Rendered length | Rollup/Rolldown's `renderedLength` when the chunk is not minified | `~` |
-| Proportional estimate | Rendered lengths scaled down so they add up to the minified chunk; CSS files split in proportion to the source of their stylesheets | `~` |
+| Rendered length | Rollup/Rolldown's `renderedLength`, or the module size webpack and Rspack report, when the chunk is not minified | `~` |
+| Proportional estimate | Rendered lengths or module sizes scaled down so they add up to the minified chunk; CSS files split in proportion to the source of their stylesheets | `~` |
 
 A sum of modules is as precise as its least precise module.
+
+esbuild reports exact bytes. Vite, webpack and Rspack report module sizes from before minification, so their plugins estimate each module from the source maps when the build writes them, and otherwise scale those sizes to the minified chunk; webpack and Rspack stats read without the plugin give the scaled estimate only.
 
 ## Limits of module-level attribution
 
@@ -59,7 +61,7 @@ Bundlers report bytes per module, not per import statement or per function. Cons
 
 - A barrel module (`index.js` re-exporting everything) reaches every module of the package that the build kept. Named imports are [traced through it](#imports-through-barrels) to the modules that define what they use, but a namespace import still counts everything the barrel reaches, and exclusive bytes count any other import of the same barrel as using all of it. A module the trace reaches counts in full, with every export it defines.
 - Exclusive bytes assume everything else stays as it is. Removing an import can change minification, constant folding, tree shaking and chunk boundaries, so the real difference of two builds can differ. [Measured costs](#measured-costs) are that difference.
-- Runtime helpers, module wrappers and chunk glue belong to no module; they count toward the totals in the status bar, not toward any import.
+- Runtime helpers, module wrappers and chunk glue belong to no module; they count toward the totals in the status bar, not toward any import. webpack's and Rspack's runtime shows as virtual modules named `webpack/runtime/…`, which no import reaches.
 
 ## Measured costs
 

@@ -30,6 +30,8 @@
         "vite",
         "rollup",
         "rolldown",
+        "webpack",
+        "rspack",
         "vue",
         "tree shaking",
         "metafile",
@@ -228,7 +230,7 @@
         "viewsWelcome": [
             {
                 "view": "trueImportCost.packages",
-                "contents": "No build metadata found yet.\n\nTrue Import Cost reads what your own production build reports. Write an esbuild metafile into a `.true-import-cost` folder, or add the `@true-import-cost/vite` or `@true-import-cost/esbuild` plugin to your build.\n\n[Import Build Metadata](command:trueImportCost.importMetadata)\n\n[Read the setup guide](https://github.com/Der-Floh/True-Import-Cost#-usage)"
+                "contents": "No build metadata found yet.\n\nTrue Import Cost reads what your own production build reports. Write an esbuild metafile or webpack stats into a `.true-import-cost` folder, or add the `@true-import-cost/vite`, `@true-import-cost/esbuild` or `@true-import-cost/webpack` plugin to your build.\n\n[Import Build Metadata](command:trueImportCost.importMetadata)\n\n[Read the setup guide](https://github.com/Der-Floh/True-Import-Cost#-usage)"
             },
             {
                 "view": "trueImportCost.whyIncluded",
@@ -253,7 +255,7 @@
                 "trueImportCost.targets": {
                     "type": "array",
                     "default": [],
-                    "markdownDescription": "Build metadata files to read in addition to the ones found automatically. Each entry names a build target and points at an esbuild metafile or a True Import Cost snapshot, relative to the workspace folder.",
+                    "markdownDescription": "Build metadata files to read in addition to the ones found automatically. Each entry names a build target and points at an esbuild metafile, webpack or Rspack stats, or a True Import Cost snapshot, relative to the workspace folder.",
                     "scope": "resource",
                     "items": {
                         "type": "object",
@@ -272,7 +274,7 @@
                             },
                             "root": {
                                 "type": "string",
-                                "markdownDescription": "Directory the bundler ran in, relative to the workspace folder. Only needed for a raw esbuild metafile when it cannot be worked out from the paths the metafile contains."
+                                "markdownDescription": "Directory the bundler ran in, relative to the workspace folder. Only needed for a raw esbuild metafile or raw webpack stats when it cannot be worked out from the paths they contain."
                             }
                         }
                     }
@@ -456,6 +458,7 @@
         "zod": "^4.6.7"
     },
     "devDependencies": {
+        "@rspack/core": "^2.3.4",
         "@stylistic/eslint-plugin": "^5.10.0",
         "@types/mocha": "^10.0.10",
         "@types/node": "^22.20.7",
@@ -476,7 +479,8 @@
         "typescript-eslint": "^8.74.0",
         "vite": "^8.3.8",
         "vitest": "^5.1.2",
-        "vue-tsc": "^3.3.14"
+        "vue-tsc": "^3.3.14",
+        "webpack": "^5.113.0"
     },
     "overrides": {
         "glob": "^14.0.2",

@@ -1,4 +1,4 @@
-import { chmod, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { chmod, copyFile, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -10,7 +10,13 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PACKAGES = [
     { directory: 'packages/esbuild', entry: 'src/plugins/esbuild.ts', peers: ['esbuild'] },
     { directory: 'packages/vite', entry: 'src/plugins/vite.ts', peers: ['vite'] },
+    { directory: 'packages/webpack', entry: 'src/plugins/webpack.ts', peers: ['webpack', '@rspack/core'], files: ['src/plugins/webpackLoader.cjs'] },
 ];
+
+const COMMONJS_IMPORT_META = {
+    inject: [path.join(ROOT, 'scripts/importMetaUrl.js')],
+    define: { 'import.meta.url': 'importMetaUrl' },
+};
 
 function readCompilerOptions() {
     const configPath = path.join(ROOT, 'src/plugins/tsconfig.json');
@@ -55,7 +61,7 @@ function declarationOf(entry, compilerOptions) {
     return text;
 }
 
-async function buildPackage({ directory, entry, peers }, compilerOptions) {
+async function buildPackage({ directory, entry, peers, files = [] }, compilerOptions) {
     const dist = path.join(ROOT, directory, 'dist');
     await rm(dist, { recursive: true, force: true });
     await mkdir(dist, { recursive: true });
@@ -70,8 +76,9 @@ async function buildPackage({ directory, entry, peers }, compilerOptions) {
         legalComments: 'none',
     };
     await Promise.all([
-        esbuild.build({ ...shared, format: 'cjs', outfile: path.join(dist, 'index.cjs') }),
+        esbuild.build({ ...shared, ...COMMONJS_IMPORT_META, format: 'cjs', outfile: path.join(dist, 'index.cjs') }),
         esbuild.build({ ...shared, format: 'esm', outfile: path.join(dist, 'index.mjs') }),
+        ...files.map(file => copyFile(path.join(ROOT, file), path.join(dist, path.basename(file)))),
     ]);
 
     const declaration = declarationOf(entry, compilerOptions);

@@ -60,7 +60,7 @@ describe('importing build metadata', () => {
             defaultUri: folder.uri,
             filters: { 'Build metadata': ['json'] },
             openLabel: 'Import',
-            title: 'Import an esbuild metafile or a True Import Cost snapshot',
+            title: 'Import an esbuild metafile, webpack or Rspack stats, or a True Import Cost snapshot',
         }]);
         expect(flushInputBoxes()).toEqual([]);
         expect(flushConfigurationUpdates()).toEqual([]);

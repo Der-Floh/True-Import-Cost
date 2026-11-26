@@ -17,7 +17,7 @@ export async function importMetadata(): Promise<void> {
         defaultUri: firstFolder.uri,
         filters: { 'Build metadata': ['json'] },
         openLabel: 'Import',
-        title: 'Import an esbuild metafile or a True Import Cost snapshot',
+        title: 'Import an esbuild metafile, webpack or Rspack stats, or a True Import Cost snapshot',
     }) ?? [];
     if (!uri) {
         return;

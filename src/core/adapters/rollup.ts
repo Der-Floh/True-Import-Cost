@@ -1,4 +1,5 @@
 import { isRecord } from './adapter';
+import { splitProportionally } from './proportions';
 import { SnapshotBuilder } from './snapshotBuilder';
 import { dirname, isAbsolutePath, joinPath, normalizePath, relativePath, resolvePath, splitQuery } from '../paths';
 import { assetKindOf, chunkKindOf } from '../schema/snapshot';
@@ -92,17 +93,6 @@ function nameModule(rawId: string, baseDir: string): ModuleName {
 
 function isBareId(rawId: string): boolean {
     return !rawId.startsWith('\0') && !isAbsolutePath(splitQuery(rawId).path);
-}
-
-function splitProportionally(total: number, weights: readonly number[]): number[] {
-    const sum = weights.reduce((accumulated, weight) => accumulated + weight, 0);
-    if (total <= 0 || weights.length === 0) {
-        return weights.map(() => 0);
-    }
-    if (sum <= 0) {
-        return weights.map(() => total / weights.length);
-    }
-    return weights.map(weight => (total * weight) / sum);
 }
 
 interface Estimate {

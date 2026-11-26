@@ -20,7 +20,7 @@ export async function compareWithFile(baselines: BaselineStore, target: LoadedTa
         defaultUri: target.source.folder.uri,
         filters: { 'Build metadata': ['json'] },
         openLabel: 'Compare',
-        title: `Compare "${target.id}" with an esbuild metafile or a True Import Cost snapshot`,
+        title: `Compare "${target.id}" with an esbuild metafile, webpack or Rspack stats, or a True Import Cost snapshot`,
     }) ?? [];
     if (!uri) {
         return;
@@ -45,7 +45,7 @@ export async function compareBuilds(dependencies: CompareDependencies): Promise<
     type Item = vscode.QuickPickItem & { readonly action: Action };
     const items: Item[] = [
         { label: '$(pin) Pin the current build as the baseline', description: 'later builds are compared with it', action: 'pin' },
-        { label: '$(file) Compare with a metadata file…', description: 'an esbuild metafile or a snapshot', action: 'file' },
+        { label: '$(file) Compare with a metadata file…', description: 'an esbuild metafile, webpack stats or a snapshot', action: 'file' },
         ...(existing === undefined ? [] : [{ label: '$(close) Clear the baseline', description: existing.label, action: 'clear' as const }]),
     ];
     const picked = await vscode.window.showQuickPick(items, { placeHolder: `Compare builds of "${target.id}"` });

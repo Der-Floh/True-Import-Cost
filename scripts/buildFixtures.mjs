@@ -4,8 +4,10 @@ import { fileURLToPath } from 'node:url';
 import vue from '@vitejs/plugin-vue';
 import * as esbuild from 'esbuild';
 import { build } from 'vite';
+import webpack from 'webpack';
 
 import { trueImportCost } from '../packages/vite/dist/index.mjs';
+import { TrueImportCostPlugin } from '../packages/webpack/dist/index.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const FIXTURES = path.join(ROOT, 'src', 'test', 'fixtures', 'projects');
@@ -36,4 +38,21 @@ await build({
     build: { sourcemap: 'hidden' },
 });
 
-console.log('Built both fixtures; their metadata is in their .true-import-cost folders.');
+await new Promise((resolve, reject) => {
+    const compiler = webpack({
+        context: path.join(FIXTURES, 'webpack-app'),
+        mode: 'production',
+        target: 'node',
+        entry: { extension: './src/extension.js' },
+        output: { path: path.join(FIXTURES, 'webpack-app', 'dist'), filename: '[name].js', library: { type: 'commonjs2' } },
+        externals: { vscode: 'commonjs vscode' },
+        devtool: 'hidden-source-map',
+        plugins: [new TrueImportCostPlugin({ target: 'extension-host' })],
+    });
+    compiler.run((error, stats) => {
+        const failure = error ?? (stats?.hasErrors() ? new Error(stats.toString('errors-only')) : undefined);
+        compiler.close(() => (failure ? reject(failure) : resolve()));
+    });
+});
+
+console.log('Built the fixtures; their metadata is in their .true-import-cost folders.');

@@ -6,6 +6,9 @@ True Import Cost never builds your project. It reads the metadata your own build
 esbuild build ──► metafile ─────────────┐
 esbuild build ──► @true-import-cost/esbuild ──► snapshot ─┤
 Vite build ─────► @true-import-cost/vite ─────► snapshot ─┤
+webpack build ──► stats JSON ─────────────────────────────┤
+webpack build ──► @true-import-cost/webpack ──► snapshot ─┤
+Rspack build ───► @true-import-cost/webpack ──► snapshot ─┤
                                                            ▼
                                metadata store (find, validate, watch)
                                                            ▼
@@ -19,11 +22,12 @@ Vite build ─────► @true-import-cost/vite ─────► snapshot
 
 | Layer | Path | May import | Runs in |
 | --- | --- | --- | --- |
-| Core | `src/core` | nothing above it; no `vscode`, no Node built-ins | the extension host, both bundler plugins, the CLI |
+| Core | `src/core` | nothing above it; no `vscode`, no Node built-ins | the extension host, the bundler plugins, the CLI |
 | Parser | `src/parser` | core | the extension host, loaded lazily from `out/parser.js` |
 | Extension | `src/extension` | core; the parser's types, and its code only through `services/parserHost.ts` | the extension host |
 | Bundler plugins | `src/plugins` | core and Node built-ins | the user's build |
 | CLI | `src/cli` | core and Node built-ins | CI pipelines, as `@true-import-cost/cli` |
+| Drivers | `src/driver` | core and Node built-ins | a Node process of its own, which the extension starts with VS Code's runtime to bundle a package by itself |
 | Shared contract | `src/shared` | core types only | the extension host and the dashboard |
 | Dashboard | `src/webview` | `src/shared` and pure core modules | the dashboard webview |
 
@@ -32,7 +36,7 @@ ESLint enforces the boundaries (`eslint.config.mjs`), and the `core` Vitest proj
 ## Core
 
 - **Schema** (`schema/snapshot.ts`, `schema/validate.ts`) — the `BuildSnapshot` format described in [snapshot-schema.md](snapshot-schema.md), validated with `zod/mini` plus consistency checks between modules, imports and outputs.
-- **Adapters** (`adapters/`) — the `BundlerAdapter` interface (`supports`, `normalize`), the esbuild metafile adapter, the Rollup/Rolldown adapter the Vite plugin uses, and a pass-through for snapshots. `normalizeMetadata` picks the adapter that recognises the input and validates whatever it produces. A new bundler is a new adapter; nothing else changes.
+- **Adapters** (`adapters/`) — the `BundlerAdapter` interface (`supports`, `normalize`), the esbuild metafile adapter, the Rollup/Rolldown adapter the Vite plugin uses, the webpack and Rspack stats adapter, which the webpack plugin uses too, and a pass-through for snapshots. `normalizeMetadata` picks the adapter that recognises the input and validates whatever it produces. A new bundler is a new adapter; nothing else changes.
 - **Graph** (`graph/`) — `BuildGraph` indexes modules by id and by path, imports in both directions, package instances by install root (two installed versions are two instances), retained bytes and the precision of each module. On top of it: reachability, the impact of one import edge (bundled, lazy, exclusive and shared bytes), why-included chains and duplicate packages. Every traversal keeps a visited set, so cycles terminate.
 - **Attribution** (`attribution/`) — matches an import of the document to an import edge of the build, traces a named import of a barrel to the modules that define what it uses (`barrels.ts`), and turns the result into an `ImportCost`.
 
@@ -54,6 +58,16 @@ The trace names the defining modules, the barrels it passed through, and what th
 
 The exports come from `analyzeExports` in the parser. The extension reads them on demand: `ImportCostService` attributes the document's imports with the analyses it has, collects the modules the trace asked for and did not get, has `services/barrelExports.ts` read and parse those files through `vscode.workspace.fs`, and attributes again until nothing is missing. Files over 2 MB are not read, analyses are cached by file, and the cache is dropped whenever the build metadata reloads.
 
+## Reading webpack and Rspack stats
+
+`core/adapters/webpack.ts` reads the stats JSON of webpack 5 and Rspack, as `stats.toJson()` and `webpack --json` write it; `@true-import-cost/webpack` passes it the same JSON, asked for with the options it needs. Module names in stats are relative to webpack's `context` and may start with loaders (`./node_modules/css-loader/dist/cjs.js!./src/style.css`), so a module is named after the resource at the end of its name, query included; a module without a file, such as a `webpack/runtime/…` module or a context module, stays virtual under its name. A concatenated module (`./src/index.js + 4 modules`) gives way to the modules inside it, which take its chunks, and its own reasons, such as being the entry, go to its root module.
+
+A module's `reasons` are the imports of it. Their type tells static, dynamic `import()`, `require`, CSS and reference imports apart, `userRequest` is the specifier as written, and the importer is the module inside a concatenated module whenever the stats name it. When the bundler skips a side-effect-free barrel, it points the reasons for the names an import uses at the modules that define them; those are kept only when the stats show no import of the barrel itself, so an import edge leads to the module its specifier resolves to. External modules become external imports, retained when a chunk or a concatenated module still contains them.
+
+Every JavaScript and CSS file of a chunk is a chunk of the snapshot. Chunks of an entry point load initially and import the other chunks of their group; the chunks an `import()` loads are dynamic imports. Module sizes in stats are from before minification, so what a module contributes to a file is estimated, from the file's source map when the plugin has one and otherwise by scaling the JavaScript or CSS sizes of the file's modules to the file. Stats without modules, chunks, assets, reasons or the modules inside concatenated modules are rejected with an error that says how to write complete ones.
+
+While True Import Cost measures, the plugin stops emitting through `shouldEmit`, tapped before any other plugin, turns `output.clean` off, and fails the build from `emit` should another plugin turn emitting back on. It applies the edits with `webpackLoader.cjs`, added as the last `enforce: 'pre'` rule so that it sees each file before any other loader. Rspack passes loader options on as JSON, so the loader finds the edits in the build process by a key in its options.
+
 ## Parser
 
 `src/parser/script.ts` parses a document with the TypeScript compiler API and builds a one-file program with no libraries and no module resolution, which is fast and enough for the checker to resolve local symbols. Every identifier with the name of an imported binding is resolved to its symbol, so shadowed names never count. Each reference is classified as a type or a value use, and value uses further as calls, member accesses (`x.y`, `x['y']`, destructuring) or escapes (passed on, spread, exported, computed access).
@@ -72,6 +86,7 @@ TypeScript and the Vue compiler are several megabytes, so the parser is its own 
 - **Providers and views** — inlay hints, hover, duplicate-package and budget diagnostics, the status bar, Bundle Contents and Why Included.
 - **Dashboard** — `dashboard/dashboardModel.ts` turns a target, its baseline, its history and its budget into the plain JSON model of `src/shared/dashboard.ts`; `dashboard/dashboardPanel.ts` owns the webview panel, posts the model and acts on the messages of `src/shared/messages.ts` after checking them. The page is a Vue 3 app in `src/webview`, built by Vite into one script that `media/dashboard.html` loads under a nonce-based content security policy. It renders the model as text only: icons come from a fixed set of codicons, and a test makes sure no other HTML is ever inserted. The treemap is a squarified layout (`treemap/squarify.ts`) that shows one level at a time and folds tiles too small to see (`treemap/nodes.ts`); the history chart's scales are in `chart/scales.ts`.
 - **Comparison and history** — `core/compare.ts` compares two builds by package, chunk and module. A chunk is matched by its entry module, or else by its file name without the content hash; chunks that share such a name, like esbuild's `chunk-<hash>.js`, are paired by the modules they hold. `core/chunks.ts` decides what loads initially; `core/budgets.ts` reads and checks budgets. Baselines and history entries are stored as JSON in the extension's storage by `services/baselineStore.ts` and `services/historyStore.ts`.
+- **Measuring** — `measure/importMeasurer.ts` plans the edit that takes an import out of the saved file (`parser/removal.ts`), finds the build command (`measure/buildCommand.ts`), asks before it runs anything (`measure/consent.ts`), runs the build twice through `measure/buildRunner.ts`, the one module allowed a child process, and compares the two snapshots (`core/measurement.ts`). The request it hands the plugins, and the report they write back, are `core/measureProtocol.ts`. `measure/standaloneSizes.ts` runs `out/standalone.js` (`src/driver`) to bundle a package by itself, and both kinds of result are kept in VS Code's storage (`services/measurementStore.ts`).
 
 ## CLI
 
@@ -81,9 +96,9 @@ TypeScript and the Vue compiler are several megabytes, so the parser is its own 
 
 | Operation | Approach |
 | --- | --- |
-| Activation | Registers providers and starts finding metadata; `out/extension.js` is about 115 kB minified, and a test keeps the parser out of it |
+| Activation | Registers providers and starts finding metadata; `out/extension.js` is about 160 kB minified, and a test keeps the parser out of it |
 | First analysis | Loads `out/parser.js` once |
 | Analysis | One parse per document version, after the document has been unchanged for `analysis.debounceMs` |
 | Costs | Graph traversals cached per graph and import edge |
 | Barrels | Only for named imports of modules whose imports branch; each file on the way parsed once until the metadata reloads |
-| Builds | None. The extension only reads what your build writes |
+| Builds | None, unless you measure an import or a standalone size: then the build command, or the project's bundler, runs once or twice in a process of its own |

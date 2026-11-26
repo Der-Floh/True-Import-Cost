@@ -1,6 +1,7 @@
 import { MetadataError } from './adapter';
 import { esbuildAdapter } from './esbuild';
 import { rollupAdapter } from './rollup';
+import { webpackAdapter } from './webpack';
 import { isSnapshotLike, parseSnapshot } from '../schema/validate';
 
 import type { BuildContext, BundlerAdapter } from './adapter';
@@ -15,7 +16,7 @@ export const snapshotAdapter: BundlerAdapter<BuildSnapshot> = {
     },
 };
 
-export const BUILTIN_ADAPTERS: readonly BundlerAdapter<unknown>[] = [snapshotAdapter, esbuildAdapter, rollupAdapter];
+export const BUILTIN_ADAPTERS: readonly BundlerAdapter<unknown>[] = [snapshotAdapter, esbuildAdapter, rollupAdapter, webpackAdapter];
 
 export type NormalizeResult =
     | { readonly ok: true; readonly snapshot: BuildSnapshot; readonly adapter: string }

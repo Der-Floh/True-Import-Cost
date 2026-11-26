@@ -31,6 +31,8 @@ describe('the README', () => {
         expect(readme).toContain('SECURITY.md');
         expect(readme).toContain('@true-import-cost/vite');
         expect(readme).toContain('@true-import-cost/esbuild');
+        expect(readme).toContain('@true-import-cost/webpack');
+        expect(readme).toContain('@true-import-cost/cli');
     });
 });
 
@@ -41,7 +43,7 @@ describe('the changelog', () => {
 });
 
 describe('the plugin packages', () => {
-    it.each(['packages/esbuild', 'packages/vite'])('%s documents every option it accepts', (directory) => {
+    it.each(['packages/esbuild', 'packages/vite', 'packages/webpack'])('%s documents every option it accepts', (directory) => {
         const source = readFileSync(directory.replace('packages/', 'src/plugins/').concat('.ts'), 'utf8');
         const options = [...(/export interface TrueImportCostOptions \{([\s\S]*?)\n\}/.exec(source)?.[1] ?? '').matchAll(/readonly (\w+)\?/g)].map(match => match[1]);
         const packageReadme = readFileSync(`${directory}/README.md`, 'utf8');

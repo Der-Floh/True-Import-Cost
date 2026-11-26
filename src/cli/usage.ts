@@ -1,8 +1,7 @@
 export const USAGE = `Usage: true-import-cost <command> [options]
 
 Reports what a production build contains, from the metadata its bundler wrote:
-a True Import Cost snapshot, an esbuild metafile, or any other build metadata
-the True Import Cost extension reads.
+a True Import Cost snapshot, an esbuild metafile, or webpack or Rspack stats.
 
 Commands:
   summary <metadata>              Sizes, the largest packages and duplicates

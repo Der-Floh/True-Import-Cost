@@ -8,8 +8,8 @@
         <section v-else-if="selected === undefined" class="state state--empty" aria-labelledby="empty-heading">
             <h1 id="empty-heading" class="state__title">No build metadata yet</h1>
             <p>
-                Write an esbuild metafile into a <code>.true-import-cost</code> folder, or add the
-                <code>@true-import-cost/vite</code> or <code>@true-import-cost/esbuild</code> plugin to your build.
+                Write an esbuild metafile or webpack stats into a <code>.true-import-cost</code> folder, or add the
+                <code>@true-import-cost/vite</code>, <code>@true-import-cost/esbuild</code> or <code>@true-import-cost/webpack</code> plugin to your build.
             </p>
             <ul v-if="failures.length > 0" class="state__failures">
                 <li v-for="target in failures" :key="target.key">

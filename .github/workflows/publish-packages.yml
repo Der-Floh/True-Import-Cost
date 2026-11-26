@@ -10,6 +10,7 @@ on:
         options:
           - esbuild
           - vite
+          - webpack
           - cli
 
 concurrency:
