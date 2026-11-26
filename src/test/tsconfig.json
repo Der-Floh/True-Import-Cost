@@ -13,6 +13,7 @@
     ],
     "exclude": [
         "integration",
-        "fixtures"
+        "fixtures",
+        "webview"
     ]
 }

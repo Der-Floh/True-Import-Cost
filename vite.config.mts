@@ -3,7 +3,7 @@ import vue from '@vitejs/plugin-vue';
 import { defineConfig } from 'vite';
 
 export default defineConfig(({ mode }) => ({
-    plugins: [vue()],
+    plugins: [vue({ features: { optionsAPI: false } })],
     define: {
         'process.env.NODE_ENV': JSON.stringify(mode === 'development' ? 'development' : 'production'),
     },
