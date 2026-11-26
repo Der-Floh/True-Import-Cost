@@ -5,12 +5,13 @@ import { writeDashboardTemplate, lastModel, openDashboard, rebuild, send } from 
 import { activateExtension, settle, statusBar } from './support/extension';
 import { EXTENSION_HOST_KEY, EXTENSION_HOST_METADATA, extensionHostMetafile, writeExtensionHost } from './support/fixtures';
 import { esbuildMetafile } from './support/metafile';
-import { writeJson } from './support/workspace';
+import { writeJson, writeSource } from './support/workspace';
 import {
     flushExecutedCommands,
     flushFileWrites,
     flushLogs,
     readVirtualFile,
+    setActiveTextEditor,
     setSetting,
     setWorkspaceFolders,
     webviewPanels,
@@ -114,6 +115,23 @@ describe('the bundle dashboard panel', () => {
 
         expect(lastModel(panel).selected?.id).toBe('webview');
         expect(lastModel(panel).comparison?.targets.map(target => target.id)).toEqual(['extension-host', 'webview']);
+    });
+
+    it('follows the build target of the active editor, and sends nothing new for another file of the same target', async () => {
+        writeJson('/w/.true-import-cost/webview.json', esbuildMetafile({ entry: 'web/main.ts', inputs: { 'web/main.ts': { output: 9_000 } } }));
+        await vscode.commands.executeCommand('trueImportCost.refresh');
+        setActiveTextEditor(writeSource('/w/web/main.ts', 'export {};\n'));
+        const panel = await openDashboard();
+        expect(lastModel(panel).selected?.id).toBe('webview');
+
+        setActiveTextEditor(writeSource('/w/src/log.ts', 'export function log(): void {}\n'));
+        await settle();
+        expect(lastModel(panel).selected?.id).toBe('extension-host');
+
+        const posted = panel.webview.posted.length;
+        setActiveTextEditor(writeSource('/w/src/format.ts', 'export function formatSize(): void {}\n'));
+        await settle();
+        expect(panel.webview.posted).toHaveLength(posted);
     });
 
     it('is opened anew once it was closed', async () => {

@@ -60,7 +60,7 @@ TypeScript and the Vue compiler are several megabytes, so the parser is its own 
 - **Presentation** — `labels.ts` and `hoverContent.ts` turn costs into text; everything from metadata is escaped.
 - **Providers and views** — inlay hints, hover, duplicate-package and budget diagnostics, the status bar, Bundle Contents and Why Included.
 - **Dashboard** — `dashboard/dashboardModel.ts` turns a target, its baseline, its history and its budget into the plain JSON model of `src/shared/dashboard.ts`; `dashboard/dashboardPanel.ts` owns the webview panel, posts the model and acts on the messages of `src/shared/messages.ts` after checking them. The page is a Vue 3 app in `src/webview`, built by Vite into one script that `media/dashboard.html` loads under a nonce-based content security policy.
-- **Comparison and history** — `core/compare.ts` compares two builds by package, chunk (by entry module, or file name without its content hash) and module; `core/chunks.ts` decides what loads initially; `core/budgets.ts` reads and checks budgets. Baselines and history entries are stored as JSON in the extension's storage by `services/baselineStore.ts` and `services/historyStore.ts`.
+- **Comparison and history** — `core/compare.ts` compares two builds by package, chunk and module. A chunk is matched by its entry module, or else by its file name without the content hash; chunks that share such a name, like esbuild's `chunk-<hash>.js`, are paired by the modules they hold. `core/chunks.ts` decides what loads initially; `core/budgets.ts` reads and checks budgets. Baselines and history entries are stored as JSON in the extension's storage by `services/baselineStore.ts` and `services/historyStore.ts`.
 
 ## Performance
 

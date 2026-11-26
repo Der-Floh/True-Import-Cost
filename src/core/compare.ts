@@ -2,7 +2,7 @@ import { sizeTotals } from './chunks';
 
 import type { SizeTotals } from './chunks';
 import type { BuildGraph } from './graph/buildGraph';
-import type { ChunkRecord } from './schema/snapshot';
+import type { BuildSnapshot, ChunkRecord } from './schema/snapshot';
 
 export type ChangeStatus = 'added' | 'removed' | 'changed' | 'unchanged';
 
@@ -107,22 +107,111 @@ function comparePackages(baseline: BuildGraph, current: BuildGraph): PackageDelt
     }).sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta) || b.after - a.after || a.name.localeCompare(b.name));
 }
 
+function groupInto<T>(groups: Map<string, T[]>, key: string, value: T): void {
+    const group = groups.get(key);
+    if (group) {
+        group.push(value);
+    } else {
+        groups.set(key, [value]);
+    }
+}
+
+function modulesByChunk(snapshot: BuildSnapshot): Map<string, string[]> {
+    const modules = new Map<string, string[]>();
+    for (const module of snapshot.modules) {
+        for (const contribution of module.contributions) {
+            groupInto(modules, contribution.chunkId, module.id);
+        }
+    }
+    return modules;
+}
+
+function chunksByKey(chunks: readonly ChunkRecord[]): Map<string, ChunkRecord[]> {
+    const groups = new Map<string, ChunkRecord[]>();
+    for (const chunk of chunks) {
+        groupInto(groups, chunkKey(chunk), chunk);
+    }
+    return groups;
+}
+
+interface ChunkSide {
+    readonly chunks: readonly ChunkRecord[];
+    readonly modules: ReadonlyMap<string, readonly string[]>;
+}
+
+interface PairCandidate {
+    readonly before: ChunkRecord;
+    readonly after: ChunkRecord;
+    readonly sharedModules: number;
+}
+
+type ChunkPair = readonly [ChunkRecord | undefined, ChunkRecord | undefined];
+
+function sizeGap(candidate: PairCandidate): number {
+    return Math.abs(candidate.before.bytes - candidate.after.bytes);
+}
+
+function pairCandidates(before: ChunkSide, after: ChunkSide): PairCandidate[] {
+    const holders = new Map<string, ChunkRecord[]>();
+    for (const chunk of after.chunks) {
+        for (const id of after.modules.get(chunk.id) ?? []) {
+            groupInto(holders, id, chunk);
+        }
+    }
+    const candidates: PairCandidate[] = [];
+    for (const chunk of before.chunks) {
+        const shared = new Map<ChunkRecord, number>();
+        for (const id of before.modules.get(chunk.id) ?? []) {
+            for (const holder of holders.get(id) ?? []) {
+                shared.set(holder, (shared.get(holder) ?? 0) + 1);
+            }
+        }
+        for (const [holder, sharedModules] of shared) {
+            candidates.push({ before: chunk, after: holder, sharedModules });
+        }
+    }
+    return candidates.sort((a, b) => b.sharedModules - a.sharedModules || sizeGap(a) - sizeGap(b));
+}
+
+function pairChunks(before: ChunkSide, after: ChunkSide): ChunkPair[] {
+    const pairedBefore = new Set<ChunkRecord>();
+    const pairedAfter = new Set<ChunkRecord>();
+    const pairs: ChunkPair[] = [];
+    for (const candidate of pairCandidates(before, after)) {
+        if (!pairedBefore.has(candidate.before) && !pairedAfter.has(candidate.after)) {
+            pairedBefore.add(candidate.before);
+            pairedAfter.add(candidate.after);
+            pairs.push([candidate.before, candidate.after]);
+        }
+    }
+    const removed = before.chunks.filter(chunk => !pairedBefore.has(chunk));
+    const added = after.chunks.filter(chunk => !pairedAfter.has(chunk));
+    if (removed.length === 1 && added.length === 1) {
+        return [...pairs, [removed[0], added[0]]];
+    }
+    return [...pairs, ...removed.map((chunk): ChunkPair => [chunk, undefined]), ...added.map((chunk): ChunkPair => [undefined, chunk])];
+}
+
+function chunkDelta(key: string, [old, now]: ChunkPair): ChunkDelta {
+    return {
+        key,
+        ...(old === undefined ? {} : { before: old.id }),
+        ...(now === undefined ? {} : { after: now.id }),
+        bytesBefore: old?.bytes ?? 0,
+        bytesAfter: now?.bytes ?? 0,
+        delta: (now?.bytes ?? 0) - (old?.bytes ?? 0),
+    };
+}
+
 function compareChunks(baseline: BuildGraph, current: BuildGraph): ChunkDelta[] {
-    const before = new Map(baseline.snapshot.chunks.map(chunk => [chunkKey(chunk), chunk]));
-    const after = new Map(current.snapshot.chunks.map(chunk => [chunkKey(chunk), chunk]));
+    const before = chunksByKey(baseline.snapshot.chunks);
+    const after = chunksByKey(current.snapshot.chunks);
+    const modulesBefore = modulesByChunk(baseline.snapshot);
+    const modulesAfter = modulesByChunk(current.snapshot);
     const keys = new Set([...before.keys(), ...after.keys()]);
-    return [...keys].map((key): ChunkDelta => {
-        const old = before.get(key);
-        const now = after.get(key);
-        return {
-            key,
-            ...(old === undefined ? {} : { before: old.id }),
-            ...(now === undefined ? {} : { after: now.id }),
-            bytesBefore: old?.bytes ?? 0,
-            bytesAfter: now?.bytes ?? 0,
-            delta: (now?.bytes ?? 0) - (old?.bytes ?? 0),
-        };
-    }).sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta) || b.bytesAfter - a.bytesAfter);
+    return [...keys]
+        .flatMap(key => pairChunks({ chunks: before.get(key) ?? [], modules: modulesBefore }, { chunks: after.get(key) ?? [], modules: modulesAfter }).map(pair => chunkDelta(key, pair)))
+        .sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta) || b.bytesAfter - a.bytesAfter);
 }
 
 function compareModules(baseline: BuildGraph, current: BuildGraph, limit: number): ModuleDelta[] {

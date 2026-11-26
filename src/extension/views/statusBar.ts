@@ -53,11 +53,11 @@ export class TargetStatusBar implements vscode.Disposable {
         }
 
         const { target, containsActiveDocument } = resolved;
-        const totals = target.graph.totals();
+        const totals = sizeTotals(target.snapshot);
         const failure = this.store.failureFor(target.key);
         const baseline = this.baselines.peek(target.key);
         const budget = budgetFor(this.settings().budgets, target.id);
-        const overBudget = budget === undefined ? [] : evaluateBudgets(budget, sizeTotals(target.snapshot), target.graph).filter(result => result.exceeded && result.kind !== 'package');
+        const overBudget = budget === undefined ? [] : evaluateBudgets(budget, totals, target.graph).filter(result => result.exceeded && result.kind !== 'package');
         const delta = baseline === undefined ? undefined : totals.total - sizeTotals(baseline.graph.snapshot).total;
         const deltaText = delta === undefined || delta === 0 ? '' : ` (${delta > 0 ? '+' : '−'}${formatBytes(Math.abs(delta))})`;
         this.item.text = `${failure || overBudget.length > 0 ? '$(warning)' : '$(package)'} ${target.id} · ${formatBytes(totals.total)}${deltaText}`;
@@ -68,7 +68,7 @@ export class TargetStatusBar implements vscode.Disposable {
             '',
             `${escapeMarkdown(bundler)}${snapshot.bundler.engine === undefined ? '' : ` (${escapeMarkdown(snapshot.bundler.engine)})`}${snapshot.mode === undefined ? '' : ` · ${snapshot.mode}`}`,
             '',
-            `JavaScript ${escapeMarkdown(formatBytes(totals.js))} · CSS ${escapeMarkdown(formatBytes(totals.css))} · other assets ${escapeMarkdown(formatBytes(totals.assets))}`,
+            `JavaScript ${escapeMarkdown(formatBytes(totals.javascript))} · CSS ${escapeMarkdown(formatBytes(totals.css))} · other assets ${escapeMarkdown(formatBytes(totals.assets))}`,
             '',
             `${target.graph.moduleCount} modules · ${target.graph.packages().size} packages · built ${escapeMarkdown(formatAge(Date.now() - snapshot.createdAt))}`,
             '',

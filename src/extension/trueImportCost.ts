@@ -113,7 +113,10 @@ export class TrueImportCost implements vscode.Disposable {
                 this.recordHistory();
                 this.updateAll(true);
             }),
-            this.baselines.onDidChange(() => this.updateAll(false)),
+            this.baselines.onDidChange(() => {
+                this.statusBar.update();
+                this.dashboard.refresh();
+            }),
             this.history.onDidChange(() => this.dashboard.refresh()),
             selection.onDidChange(() => this.updateAll(true)),
             vscode.workspace.onDidChangeConfiguration((event) => {
@@ -174,12 +177,12 @@ export class TrueImportCost implements vscode.Disposable {
             this.diagnostics.refreshAll();
         }
         this.statusBar.update();
-        this.dashboard.refresh();
         const resolved = this.current.resolve();
         this.packagesView.description = resolved?.target.id;
         if (contentChanged || resolved?.target.key !== this.shownTargetKey) {
             this.shownTargetKey = resolved?.target.key;
             this.packages.refresh();
+            this.dashboard.refresh();
         }
     }
 }

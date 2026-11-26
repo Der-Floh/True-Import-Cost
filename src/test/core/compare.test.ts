@@ -14,6 +14,17 @@ function baseline() {
         .graph();
 }
 
+function splitBuild(chunks: readonly (readonly [string, number, readonly string[]])[]) {
+    const build = fixture();
+    for (const [id, bytes, modules] of chunks) {
+        for (const module of modules) {
+            build.module(module, 10, { chunk: id });
+        }
+        build.chunk({ id, bytes });
+    }
+    return build.graph();
+}
+
 function current() {
     return fixture()
         .module('src/main.ts', 120, { entry: true, chunk: 'assets/index-ZZ99yy88.js' })
@@ -68,6 +79,37 @@ describe('comparing two builds of a target', () => {
         expect(chunks.map(item => [item.key, item.before, item.after, item.delta])).toEqual([
             ['js:src/main.ts', 'assets/index-AB12cd34.js', 'assets/index-ZZ99yy88.js', -4200],
             ['js:assets/Lazy.js', 'assets/Lazy-Qq9ZxY10.js', 'assets/Lazy-Rr0ZxY11.js', -20],
+        ]);
+    });
+
+    it('pairs chunks that share a name without its hash by the modules they hold', () => {
+        const before = splitBuild([['dist/chunk-AAAA1111.js', 100, ['src/a.ts', 'src/b.ts']], ['dist/chunk-BBBB2222.js', 50, ['src/c.ts']]]);
+        const after = splitBuild([['dist/chunk-CCCC3333.js', 80, ['src/c.ts', 'src/d.ts']], ['dist/chunk-DDDD4444.js', 90, ['src/a.ts', 'src/b.ts']]]);
+
+        expect(compareBuilds(before, after).chunks.map(item => [item.key, item.before, item.after, item.delta])).toEqual([
+            ['js:dist/chunk.js', 'dist/chunk-BBBB2222.js', 'dist/chunk-CCCC3333.js', 30],
+            ['js:dist/chunk.js', 'dist/chunk-AAAA1111.js', 'dist/chunk-DDDD4444.js', -10],
+        ]);
+    });
+
+    it('reports a chunk of a shared name with nothing in common as removed or added', () => {
+        const before = splitBuild([['dist/chunk-AAAA1111.js', 100, ['src/a.ts']], ['dist/chunk-BBBB2222.js', 50, ['src/b.ts']]]);
+        const after = splitBuild([['dist/chunk-CCCC3333.js', 100, ['src/a.ts']], ['dist/chunk-DDDD4444.js', 70, ['src/x.ts']], ['dist/chunk-EEEE5555.js', 20, ['src/y.ts']]]);
+
+        expect(compareBuilds(before, after).chunks.map(item => [item.before, item.after, item.delta])).toEqual([
+            [undefined, 'dist/chunk-DDDD4444.js', 70],
+            ['dist/chunk-BBBB2222.js', undefined, -50],
+            [undefined, 'dist/chunk-EEEE5555.js', 20],
+            ['dist/chunk-AAAA1111.js', 'dist/chunk-CCCC3333.js', 0],
+        ]);
+    });
+
+    it('pairs the only chunk of a name even when everything in it changed', () => {
+        const before = splitBuild([['dist/vendor-AAAA1111.js', 100, ['src/a.ts']]]);
+        const after = splitBuild([['dist/vendor-BBBB2222.js', 120, ['src/b.ts']]]);
+
+        expect(compareBuilds(before, after).chunks.map(item => [item.before, item.after, item.delta])).toEqual([
+            ['dist/vendor-AAAA1111.js', 'dist/vendor-BBBB2222.js', 20],
         ]);
     });
 

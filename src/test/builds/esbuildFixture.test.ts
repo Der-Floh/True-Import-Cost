@@ -2,6 +2,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 
 import { attributeFile, buildEsbuildFixture, ESBUILD_FIXTURE, graphOf, only, withFixtureVersions } from './support';
 import { normalizeEsbuildMetafile } from '../../core/adapters/esbuild';
+import { sizeTotals } from '../../core/chunks';
 import { duplicatePackages } from '../../core/graph/duplicates';
 import { explainInclusion } from '../../core/graph/whyIncluded';
 import { parseSnapshot } from '../../core/schema/validate';
@@ -55,7 +56,7 @@ describe('a real esbuild production build, normalised', () => {
 
     it('finds the entry point and the output size', () => {
         expect(graph.entries).toEqual(['src/extension.ts']);
-        expect(graph.totals().js).toBe(Object.values(metafile.outputs).reduce((sum, output) => sum + output.bytes, 0));
+        expect(sizeTotals(graph.snapshot).javascript).toBe(Object.values(metafile.outputs).reduce((sum, output) => sum + output.bytes, 0));
     });
 });
 

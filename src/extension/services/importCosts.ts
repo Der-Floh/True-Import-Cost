@@ -47,8 +47,8 @@ export class ImportCostService {
         return this.selection.pick(this.targetsFor(document));
     }
 
-    public analyze(document: vscode.TextDocument, token: vscode.CancellationToken): Promise<DocumentAnalysis | undefined> {
-        return this.analyzer.analyze(document, token);
+    public importsIn(fileName: string, text: string): Promise<DocumentAnalysis> {
+        return this.analyzer.importsIn(fileName, text);
     }
 
     public costIn(target: LoadedTarget, documentUri: vscode.Uri, source: SourceImport): ImportCost | undefined {

@@ -30,6 +30,15 @@ function wait(milliseconds: number, token: vscode.CancellationToken): Promise<bo
     });
 }
 
+function parse(languageId: string, fileName: string, text: string, usage: boolean): Promise<DocumentAnalysis> {
+    return loadParser()
+        .then(parser => parser.analyzeDocument(languageId, fileName, text, { usage }))
+        .catch((error: unknown) => {
+            Logger.error(`Analysing ${fileName} failed: ${error instanceof Error ? error.message : String(error)}`);
+            return EMPTY;
+        });
+}
+
 export class DocumentAnalyzer implements vscode.Disposable {
     private readonly settings: () => Settings;
     private readonly cache = new Map<string, CachedAnalysis>();
@@ -77,15 +86,13 @@ export class DocumentAnalyzer implements vscode.Disposable {
         if (text.length > MAX_DOCUMENT_LENGTH) {
             return EMPTY;
         }
-        const { languageId, fileName, version } = document;
-        const analysis = loadParser()
-            .then(parser => parser.analyzeDocument(languageId, fileName, text, { usage: settings.usageAnalysis }))
-            .catch((error: unknown) => {
-                Logger.error(`Analysing ${document.uri.toString()} failed: ${error instanceof Error ? error.message : String(error)}`);
-                return EMPTY;
-            });
-        this.cache.set(key, { version, usage: settings.usageAnalysis, analysis });
+        const analysis = parse(document.languageId, document.fileName, text, settings.usageAnalysis);
+        this.cache.set(key, { version: document.version, usage: settings.usageAnalysis, analysis });
         return analysis;
+    }
+
+    public importsIn(fileName: string, text: string): Promise<DocumentAnalysis> {
+        return text.length > MAX_DOCUMENT_LENGTH ? Promise.resolve(EMPTY) : parse('', fileName, text, false);
     }
 
     public clear(): void {

@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 
+import { sizeTotals } from '../../core/chunks';
 import { formatBytes } from '../../core/format';
 
 import type { SnapshotStore } from '../services/snapshotStore';
@@ -26,7 +27,7 @@ export async function selectTarget(store: SnapshotStore, selection: TargetSelect
             const failure = store.failureFor(target.key);
             return {
                 label: `${target.key === selected ? '$(check) ' : ''}${target.id}`,
-                description: `${bundler} · ${formatBytes(target.graph.totals().total)}`,
+                description: `${bundler} · ${formatBytes(sizeTotals(target.snapshot).total)}`,
                 detail: `${vscode.workspace.asRelativePath(target.source.uri)}${failure ? ` · last update failed: ${failure.error}` : ''}`,
                 key: target.key,
             };

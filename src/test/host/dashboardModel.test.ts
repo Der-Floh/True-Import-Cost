@@ -177,6 +177,29 @@ describe('the dashboard model', () => {
         expect(selected?.moduleChanges[0]).toEqual({ id: 'node_modules/moment/moment.js', label: 'moment/moment.js', before: 20_000, after: 0, delta: -20_000 });
     });
 
+    it('gives each chunk its own change when several share a name without its hash', () => {
+        const build = (chunks: readonly (readonly [string, number, string])[]) => {
+            const result = fixture().module('src/main.ts', 10, { entry: true, chunk: 'dist/main.js' }).chunk({ id: 'dist/main.js', bytes: 10, entry: true, entryModule: 'src/main.ts' });
+            for (const [id, bytes, module] of chunks) {
+                result.module(module, bytes, { chunk: id }).chunk({ id, bytes });
+            }
+            return result.snapshot();
+        };
+        const before = build([['dist/chunk-AAAA1111.js', 1_000, 'src/a.ts'], ['dist/chunk-BBBB2222.js', 2_000, 'src/b.ts']]);
+        const target = loadedTarget(build([['dist/chunk-CCCC3333.js', 2_500, 'src/b.ts'], ['dist/chunk-DDDD4444.js', 900, 'src/a.ts']]), 'split');
+        const selected = buildDashboardModel({
+            targets: [{ target }],
+            selected: { target, metadataPath: '', history: [], baseline: baselineOf(before) },
+            historyEnabled: true,
+        }).selected;
+
+        expect(selected?.chunks.map(chunk => [chunk.id, chunk.delta])).toEqual([
+            ['dist/main.js', 0],
+            ['dist/chunk-CCCC3333.js', 500],
+            ['dist/chunk-DDDD4444.js', -100],
+        ]);
+    });
+
     it('checks the budget and marks packages over theirs', () => {
         const target = loadedTarget(webview(), 'webview');
         const budget = parseBudgets({ webview: { initial: '50 kB', packages: { 'lodash*': '2 kB' } } }).get('webview');

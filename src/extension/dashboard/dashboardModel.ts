@@ -1,6 +1,6 @@
 import { evaluateBudgets, packageLimit } from '../../core/budgets';
 import { chunkLoading, lazyBytesByModule, sizeTotals } from '../../core/chunks';
-import { chunkKey, compareBuilds } from '../../core/compare';
+import { compareBuilds } from '../../core/compare';
 import { duplicatePackages } from '../../core/graph/duplicates';
 import { relativePath } from '../../core/paths';
 import { displayModulePath } from '../presentation/modulePaths';
@@ -272,10 +272,10 @@ function packageRows(graph: BuildGraph, comparison: BuildComparison | undefined,
 
 function chunkRows(graph: BuildGraph, comparison: BuildComparison | undefined): ChunkRowDto[] {
     const loading = chunkLoading(graph.snapshot);
-    const deltas = new Map(comparison?.chunks.map(change => [change.key, change.delta]) ?? []);
+    const deltas = new Map(comparison?.chunks.flatMap(change => (change.after === undefined ? [] : [[change.after, change.delta] as const])) ?? []);
     return graph.snapshot.chunks.map((chunk): ChunkRowDto => {
         const entry = chunk.entryModule === undefined ? undefined : graph.module(chunk.entryModule);
-        const delta = deltas.get(chunkKey(chunk));
+        const delta = deltas.get(chunk.id);
         return {
             id: chunk.id,
             kind: chunk.kind,

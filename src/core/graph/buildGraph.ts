@@ -11,13 +11,6 @@ export interface PackageInstance {
     readonly bytes: number;
 }
 
-export interface OutputTotals {
-    readonly js: number;
-    readonly css: number;
-    readonly assets: number;
-    readonly total: number;
-}
-
 const EMPTY: readonly ImportEdge[] = [];
 
 export class BuildGraph {
@@ -128,20 +121,6 @@ export class BuildGraph {
     public packageOf(moduleId: string): PackageInstance | undefined {
         const root = this.modulesById.get(moduleId)?.packageRoot;
         return root === undefined ? undefined : this.packages().get(root);
-    }
-
-    public totals(): OutputTotals {
-        let js = 0;
-        let css = 0;
-        for (const chunk of this.snapshot.chunks) {
-            if (chunk.kind === 'css') {
-                css += chunk.bytes;
-            } else {
-                js += chunk.bytes;
-            }
-        }
-        const assets = this.snapshot.assets.reduce((sum, asset) => (asset.kind === 'sourcemap' ? sum : sum + asset.bytes), 0);
-        return { js, css, assets, total: js + css + assets };
     }
 
     private findEntries(): string[] {

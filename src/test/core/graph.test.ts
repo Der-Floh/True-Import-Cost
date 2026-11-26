@@ -65,18 +65,6 @@ describe('BuildGraph sizes', () => {
         expect(graph.bytesOf('src/unused.ts')).toBe(0);
         expect(graph.precisionOf('src/unused.ts')).toBeUndefined();
     });
-
-    it('totals JavaScript, CSS and other assets, leaving out source maps', () => {
-        const graph = fixture()
-            .chunk({ id: 'dist/main.js', bytes: 1000 })
-            .chunk({ id: 'dist/lazy.js', bytes: 250 })
-            .chunk({ id: 'dist/main.css', kind: 'css', bytes: 300 })
-            .asset({ id: 'dist/logo.png', kind: 'image', bytes: 4000 })
-            .asset({ id: 'dist/main.js.map', kind: 'sourcemap', bytes: 9000 })
-            .graph();
-
-        expect(graph.totals()).toEqual({ js: 1250, css: 300, assets: 4000, total: 5550 });
-    });
 });
 
 describe('BuildGraph packages', () => {

@@ -109,6 +109,15 @@ describe('Show Importers', () => {
         expect(shown?.selection?.start.line).toBe(0);
     });
 
+    it('reads importers that are not open from disk without opening them, and open ones as edited', async () => {
+        extension.edit(`// two lines\n// added\n${extension.getText()}`);
+
+        await vscode.commands.executeCommand('trueImportCost.showImporters', { target: EXTENSION_HOST_KEY, modules: ['src/log.ts'] });
+
+        expect(flushQuickPicks()[0]?.items.map(item => item.label)).toEqual(['$(file-code) src/extension.ts:6', '$(file-code) src/format.ts:1']);
+        expect(vscode.workspace.textDocuments.map(document => document.uri.path)).not.toContain('/w/src/format.ts');
+    });
+
     it('names the package an importer inside a package belongs to', async () => {
         await vscode.commands.executeCommand('trueImportCost.showImporters', { target: EXTENSION_HOST_KEY, packageName: 'tslib' });
 

@@ -24,6 +24,42 @@ export interface ImportSite {
 }
 
 const MAX_IMPORTERS = 200;
+const MAX_SOURCE_BYTES = 2_000_000;
+
+async function sourceText(uri: vscode.Uri): Promise<string | undefined> {
+    const open = vscode.workspace.textDocuments.find(document => document.uri.toString() === uri.toString());
+    if (open) {
+        return open.getText();
+    }
+    try {
+        const stat = await vscode.workspace.fs.stat(uri);
+        return stat.size > MAX_SOURCE_BYTES ? undefined : new TextDecoder().decode(await vscode.workspace.fs.readFile(uri));
+    } catch {
+        return undefined;
+    }
+}
+
+function lineStarts(text: string): number[] {
+    const starts = [0];
+    for (let index = text.indexOf('\n'); index !== -1; index = text.indexOf('\n', index + 1)) {
+        starts.push(index + 1);
+    }
+    return starts;
+}
+
+function positionAt(starts: readonly number[], offset: number): vscode.Position {
+    let line = 0;
+    let last = starts.length - 1;
+    while (line < last) {
+        const middle = Math.ceil((line + last) / 2);
+        if ((starts[middle] ?? 0) <= offset) {
+            line = middle;
+        } else {
+            last = middle - 1;
+        }
+    }
+    return new vscode.Position(line, offset - (starts[line] ?? 0));
+}
 
 async function sitesIn(dependencies: ImportersDependencies, target: LoadedTarget, importerId: string, subject: ReadonlySet<string>): Promise<ImportSite[]> {
     const importer = target.graph.module(importerId);
@@ -34,26 +70,23 @@ async function sitesIn(dependencies: ImportersDependencies, target: LoadedTarget
     if (importer.packageName !== undefined) {
         return [{ uri, label: displayModulePath(importer), insidePackage: importer.packageName }];
     }
-    const cancellation = new vscode.CancellationTokenSource();
-    try {
-        const document = await vscode.workspace.openTextDocument(uri);
-        const analysis = await dependencies.service.analyze(document, cancellation.token);
-        const sites: ImportSite[] = [];
-        for (const source of analysis?.imports ?? []) {
-            const cost = dependencies.service.costIn(target, uri, source);
-            const resolved = cost !== undefined && 'match' in cost ? cost.match?.edge.resolvedModule : undefined;
-            if (resolved !== undefined && subject.has(resolved)) {
-                const start = document.positionAt(source.range.start);
-                const range = new vscode.Range(start, document.positionAt(source.range.end));
-                sites.push({ uri, label: `${importer.path}:${start.line + 1}`, range, text: document.getText(range).replace(/\s+/g, ' ').trim() });
-            }
-        }
-        return sites.length > 0 ? sites : [{ uri, label: importer.path }];
-    } catch {
+    const text = await sourceText(uri);
+    if (text === undefined) {
         return [{ uri, label: importer.path }];
-    } finally {
-        cancellation.dispose();
     }
+    const analysis = await dependencies.service.importsIn(uri.path, text);
+    const starts = lineStarts(text);
+    const sites = analysis.imports.flatMap((source): ImportSite[] => {
+        const cost = dependencies.service.costIn(target, uri, source);
+        const resolved = cost !== undefined && 'match' in cost ? cost.match?.edge.resolvedModule : undefined;
+        if (resolved === undefined || !subject.has(resolved)) {
+            return [];
+        }
+        const range = new vscode.Range(positionAt(starts, source.range.start), positionAt(starts, source.range.end));
+        const statement = text.slice(source.range.start, source.range.end).replace(/\s+/g, ' ').trim();
+        return [{ uri, label: `${importer.path}:${range.start.line + 1}`, range, text: statement }];
+    });
+    return sites.length > 0 ? sites : [{ uri, label: importer.path }];
 }
 
 export async function findImportSites(dependencies: ImportersDependencies, target: LoadedTarget, moduleIds: readonly string[]): Promise<ImportSite[]> {
