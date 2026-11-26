@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 
 import { projectDirectoryOf } from './buildCommand';
-import { confirmRun } from './consent';
+import { confirmRun, describeFolder } from './consent';
 import { newMeasureWorkspace, removeMeasureWorkspace } from './measuredBuild';
 import { DISPLAY_NAME } from '../constants';
 import { formatBytes } from '../../core/format';
@@ -191,7 +191,7 @@ function consentRequest(specifier: string, cwd: vscode.Uri): ConsentRequest {
         cwd,
         message: `Bundle ${specifier} by itself to measure its standalone size?`,
         detail: [
-            `True Import Cost bundles the package with the esbuild or Rolldown installed in ${vscode.workspace.asRelativePath(cwd)}, in a process of its own, and measures the minified result.`,
+            `True Import Cost bundles the package with the esbuild or Rolldown installed in ${describeFolder(cwd)}, in a process of its own, and measures the minified result.`,
             'The bundler runs from your project\'s node_modules. Your build configuration is not used, and nothing is written to your project.',
         ].join('\n\n'),
     };

@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 
 import { buildCommandFor, isMeasurable } from './buildCommand';
-import { confirmRun } from './consent';
+import { confirmRun, describeFolder } from './consent';
 import { MeasureCancelled, measuredBuild, newMeasureWorkspace, removeMeasureWorkspace } from './measuredBuild';
 import { DISPLAY_NAME } from '../constants';
 import { formatBytes } from '../../core/format';
@@ -251,7 +251,7 @@ function consentRequest(planned: PlannedMeasurement): ConsentRequest {
         cwd: command.cwd,
         message: `Measure ${planned.specifier} by building "${target.id}" twice with "${command.command}"?`,
         detail: [
-            `True Import Cost runs the command in ${vscode.workspace.asRelativePath(command.cwd)}: once as your code is, once with this import taken out of ${planned.importer}, and compares the two builds.`,
+            `True Import Cost runs the command in ${describeFolder(command.cwd)}: once as your code is, once with this import taken out of ${planned.importer}, and compares the two builds.`,
             'Your build configuration and its plugins run as they do when you build yourself. The True Import Cost plugin keeps the build from writing its output and puts its reports in a temporary folder; anything else the command does still happens.',
         ].join('\n\n'),
     };

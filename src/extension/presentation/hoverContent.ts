@@ -180,6 +180,7 @@ export function hoverMarkdown(input: HoverInput): vscode.MarkdownString {
     lines.push(title(entry));
     lines.push(`${code(target.id)} · ${bundlerText(target)}`);
     lines.push('');
+    lines.push(...measurementLines(measurement, now).flatMap(line => [line, '']));
 
     if (cost.status === 'bundled') {
         lines.push(...costTable(cost));
@@ -207,10 +208,6 @@ export function hoverMarkdown(input: HoverInput): vscode.MarkdownString {
         if (usage.length > 0) {
             lines.push(`**Usage** · ${usage.join(' · ')}`, '');
         }
-    }
-
-    for (const line of measurementLines(measurement, now)) {
-        lines.push(line, '');
     }
 
     const facts: string[] = [];

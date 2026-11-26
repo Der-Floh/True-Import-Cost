@@ -22,6 +22,14 @@ function allowanceOf(request: ConsentRequest): string {
     return [request.kind, request.cwd.toString(), request.command].join('\u0001');
 }
 
+export function describeFolder(uri: vscode.Uri): string {
+    const folder = vscode.workspace.getWorkspaceFolder(uri);
+    if (folder?.uri.toString() === uri.toString()) {
+        return `the workspace folder ${folder.name}`;
+    }
+    return vscode.workspace.asRelativePath(uri);
+}
+
 export async function confirmRun(state: vscode.Memento, request: ConsentRequest): Promise<boolean> {
     if (!vscode.workspace.isTrusted) {
         const answer = await vscode.window.showInformationMessage(
