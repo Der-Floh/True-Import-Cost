@@ -1,5 +1,6 @@
 import stylistic from '@stylistic/eslint-plugin';
 import importX from 'eslint-plugin-import-x';
+import pluginVue from 'eslint-plugin-vue';
 import tseslint from 'typescript-eslint';
 
 const NODE_BUILTINS = [
@@ -17,11 +18,11 @@ const noVscode = message => ({ name: 'vscode', message });
 
 export default tseslint.config(
     {
-        ignores: ['out/**', 'node_modules/**', 'packages/*/dist/**', '.vscode-test/**', 'src/test/fixtures/**'],
+        ignores: ['out/**', 'public/**', 'node_modules/**', 'packages/*/dist/**', '.vscode-test/**', 'src/test/fixtures/**'],
     },
 
     {
-        files: ['**/*.ts'],
+        files: ['**/*.ts', '**/*.vue'],
         languageOptions: {
             parser: tseslint.parser,
             ecmaVersion: 2022,
@@ -102,11 +103,12 @@ export default tseslint.config(
     },
 
     {
-        files: ['src/**/*.ts'],
+        files: ['src/**/*.ts', 'src/**/*.vue'],
         languageOptions: {
             parserOptions: {
                 projectService: true,
                 tsconfigRootDir: import.meta.dirname,
+                extraFileExtensions: ['.vue'],
             },
         },
         rules: {
@@ -181,6 +183,34 @@ export default tseslint.config(
         },
     },
     {
+        files: ['src/shared/**/*.ts'],
+        rules: {
+            'no-restricted-imports': ['error', {
+                paths: [
+                    ...noNodeBuiltins('src/shared loads in the webview too: use web-standard APIs only.'),
+                    noVscode('src/shared must not import vscode: the webview imports it too.'),
+                ],
+                patterns: [
+                    { group: ['**/extension/**', '**/webview/**', '**/parser', '**/parser/**', '**/plugins/**'], message: 'src/shared is the contract between the host and the webview and depends on neither.' },
+                ],
+            }],
+        },
+    },
+    {
+        files: ['src/webview/**/*.ts', 'src/webview/**/*.vue'],
+        rules: {
+            'no-restricted-imports': ['error', {
+                paths: [
+                    ...noNodeBuiltins('The webview runs in a browser.'),
+                    noVscode('The webview talks to the host only through src/webview/vscode.ts.'),
+                ],
+                patterns: [
+                    { group: ['**/extension/**', '**/parser', '**/parser/**', '**/plugins/**'], message: 'The webview may use src/shared and the pure modules of src/core only.' },
+                ],
+            }],
+        },
+    },
+    {
         files: ['src/plugins/**/*.ts'],
         rules: {
             'no-restricted-imports': ['error', {
@@ -198,6 +228,35 @@ export default tseslint.config(
         rules: {
             'no-console': 'off',
             '@typescript-eslint/no-non-null-assertion': 'off',
+        },
+    },
+
+    ...pluginVue.configs['flat/recommended'],
+    {
+        files: ['**/*.vue'],
+        languageOptions: {
+            parserOptions: {
+                parser: tseslint.parser,
+                ecmaVersion: 2022,
+                sourceType: 'module',
+                projectService: true,
+                tsconfigRootDir: import.meta.dirname,
+                extraFileExtensions: ['.vue'],
+            },
+        },
+        rules: {
+            'vue/html-indent': ['warn', 4],
+            'vue/max-attributes-per-line': ['warn', { singleline: { max: 5 }, multiline: { max: 1 } }],
+            'vue/html-self-closing': ['warn', { html: { void: 'any', normal: 'always', component: 'always' } }],
+            'vue/singleline-html-element-content-newline': 'off',
+            'vue/no-v-html': 'error',
+        },
+    },
+    {
+        // The one place markup is injected: codicon SVGs imported at build time, never data from the model.
+        files: ['src/webview/components/CodiconIcon.vue'],
+        rules: {
+            'vue/no-v-html': 'off',
         },
     },
 );

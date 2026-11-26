@@ -5,7 +5,9 @@
             "label": "watch",
             "dependsOn": [
                 "npm: watch:esbuild",
-                "npm: watch:tsc"
+                "npm: watch:tsc",
+                "npm: watch:vue-tsc",
+                "npm: watch:vite"
             ],
             "dependsOrder": "parallel",
             "presentation": {
@@ -35,6 +37,48 @@
             "problemMatcher": "$tsc-watch",
             "isBackground": true,
             "label": "npm: watch:tsc",
+            "presentation": {
+                "group": "watch",
+                "reveal": "never"
+            }
+        },
+        {
+            "type": "npm",
+            "script": "watch:vue-tsc",
+            "group": "build",
+            "problemMatcher": "$tsc-watch",
+            "isBackground": true,
+            "label": "npm: watch:vue-tsc",
+            "presentation": {
+                "group": "watch",
+                "reveal": "never"
+            }
+        },
+        {
+            "type": "npm",
+            "script": "watch:vite",
+            "group": "build",
+            "problemMatcher": {
+                "owner": "vite",
+                "source": "vite",
+                "fileLocation": [
+                    "relative",
+                    "${workspaceFolder}"
+                ],
+                "pattern": {
+                    "regexp": "^(?!)$",
+                    "file": 1,
+                    "line": 2,
+                    "message": 3
+                },
+                "background": {
+                    "activeOnStart": true,
+                    "beginsPattern": "^\\s*build started",
+                    "endsPattern": "^\\s*built in \\d"
+                }
+            },
+            "isBackground": true,
+            "label": "npm: watch:vite",
             "presentation": {
                 "group": "watch",
                 "reveal": "never"

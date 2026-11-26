@@ -27,7 +27,8 @@
     "include": [
         "src/core/**/*.ts",
         "src/parser/**/*.ts",
-        "src/extension/**/*.ts"
+        "src/extension/**/*.ts",
+        "src/shared/**/*.ts"
     ],
     "exclude": [
         "node_modules",

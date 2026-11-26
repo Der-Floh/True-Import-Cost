@@ -168,3 +168,5 @@ CLAUDE.md
 src/test/fixtures/projects/**/dist/
 src/test/fixtures/projects/**/.true-import-cost/
 .true-import-cost/
+
+public/

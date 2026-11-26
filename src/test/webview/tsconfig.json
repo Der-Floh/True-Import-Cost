@@ -1,0 +1,17 @@
+{
+    "extends": "../../webview/tsconfig.json",
+    "compilerOptions": {
+        "noEmit": true,
+        "types": [
+            "vite/client",
+            "vscode-webview",
+            "node"
+        ]
+    },
+    "include": [
+        "**/*.ts",
+        "../../webview/**/*.ts",
+        "../../webview/**/*.vue",
+        "../../shared/**/*.ts"
+    ]
+}

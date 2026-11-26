@@ -1,5 +1,6 @@
 import { availableParallelism, totalmem } from 'node:os';
 import { fileURLToPath, URL } from 'node:url';
+import vue from '@vitejs/plugin-vue';
 import { defineConfig } from 'vitest/config';
 
 const resolvePath = (relative: string): string => fileURLToPath(new URL(relative, import.meta.url));
@@ -38,6 +39,15 @@ export default defineConfig({
                     environment: 'node',
                     include: ['src/test/host/**/*.test.ts'],
                     setupFiles: [resolvePath('./src/test/setup/host.ts')],
+                },
+            },
+            {
+                plugins: [vue()],
+                test: {
+                    name: 'webview',
+                    environment: 'jsdom',
+                    include: ['src/test/webview/**/*.test.ts'],
+                    setupFiles: [resolvePath('./src/test/setup/webview.ts')],
                 },
             },
             {
