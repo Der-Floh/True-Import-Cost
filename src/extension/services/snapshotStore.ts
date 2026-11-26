@@ -18,6 +18,8 @@ export interface TargetFailure {
 
 const RELOAD_DELAY_MS = 250;
 
+const GLOB_SYNTAX = /[*?[\]{}]/;
+
 export function documentPathIn(baseUri: vscode.Uri, documentUri: vscode.Uri): string | undefined {
     if (baseUri.scheme !== documentUri.scheme || baseUri.authority !== documentUri.authority) {
         return undefined;
@@ -30,6 +32,7 @@ export class SnapshotStore implements vscode.Disposable {
     private readonly loaded = new Map<string, LoadedTarget>();
     private readonly failed = new Map<string, TargetFailure>();
     private readonly timers = new Map<string, ReturnType<typeof setTimeout>>();
+    private readonly reads = new Map<string, number>();
     private sources = new Map<string, MetadataSource>();
     private watchers: vscode.Disposable[] = [];
     private generation = 0;
@@ -108,8 +111,10 @@ export class SnapshotStore implements vscode.Disposable {
 
     private async load(source: MetadataSource): Promise<void> {
         const key = source.uri.toString();
+        const read = (this.reads.get(key) ?? 0) + 1;
+        this.reads.set(key, read);
         const result = await loadTarget(source);
-        if (this.disposed || !this.sources.has(key)) {
+        if (this.disposed || !this.sources.has(key) || this.reads.get(key) !== read) {
             return;
         }
         if (result.ok) {
@@ -169,25 +174,30 @@ export class SnapshotStore implements vscode.Disposable {
         if (!this.isEnabled()) {
             return;
         }
-        const patterns: vscode.RelativePattern[] = [];
+        const watched: { readonly pattern: vscode.RelativePattern; readonly only?: string }[] = [];
         for (const folder of vscode.workspace.workspaceFolders ?? []) {
             if (readFolderSettings(folder).autoDiscover) {
-                patterns.push(new vscode.RelativePattern(folder, DISCOVERY_GLOB));
+                watched.push({ pattern: new vscode.RelativePattern(folder, DISCOVERY_GLOB) });
             }
         }
         for (const source of this.sources.values()) {
             if (source.setting) {
                 const name = source.uri.path.slice(source.uri.path.lastIndexOf('/') + 1);
-                patterns.push(new vscode.RelativePattern(vscode.Uri.joinPath(source.uri, '..'), name));
+                const literal = !GLOB_SYNTAX.test(name);
+                watched.push({
+                    pattern: new vscode.RelativePattern(vscode.Uri.joinPath(source.uri, '..'), literal ? name : '*'),
+                    ...(literal ? {} : { only: source.uri.toString() }),
+                });
             }
         }
-        for (const pattern of patterns) {
+        for (const { pattern, only } of watched) {
             const watcher = vscode.workspace.createFileSystemWatcher(pattern);
+            const wanted = (uri: vscode.Uri): boolean => only === undefined || uri.toString() === only;
             this.watchers.push(
                 watcher,
-                watcher.onDidCreate(uri => this.schedule(uri)),
-                watcher.onDidChange(uri => this.schedule(uri)),
-                watcher.onDidDelete(uri => this.forget(uri)),
+                watcher.onDidCreate(uri => wanted(uri) && this.schedule(uri)),
+                watcher.onDidChange(uri => wanted(uri) && this.schedule(uri)),
+                watcher.onDidDelete(uri => wanted(uri) && this.forget(uri)),
             );
         }
     }

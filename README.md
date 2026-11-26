@@ -15,7 +15,7 @@ See what each import really costs **in your production build** — read from the
 - **Separate build targets** — an extension host and a webview are separate builds, and a dependency in both is two costs, never one. Pick the target the hints measure against, or let each file use the target that contains it
 - **Usage-aware** — the hover lists what an import is used for: the members called or read, uses in a Vue template, and values that escape so the bundler may have to keep everything
 - **Removed and erased imports** — type-only imports, imports TypeScript drops because nothing uses them as values, tree-shaken modules and external modules each get their own label instead of a misleading size
-- **Vue single-file components** — `<script>` and `<script setup>` blocks are analysed in place, and a component or directive used only in the template counts as used
+- **Vue single-file components** — `<script>` and `<script setup>` blocks are analysed in place, and a component or directive used only in the template counts as used. VS Code knows `.vue` files once a Vue extension such as *Vue (Official)* is installed
 - **Explain why included** — the shortest import chains from each entry point to a module or package, in the *Why Included* view. Click an inline hint to ask
 - **Duplicate packages** — a package bundled in two versions, or from two install locations, gets an information diagnostic with the size of each copy
 - **Stale-result detection** — a file changed since the last build says `source changed` instead of passing old numbers off as current

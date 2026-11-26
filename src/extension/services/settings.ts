@@ -132,8 +132,9 @@ export async function setInlayHintsEnabled(enabled: boolean): Promise<void> {
 
 export async function addTargetSetting(folder: vscode.WorkspaceFolder, target: TargetSetting): Promise<void> {
     const configuration = vscode.workspace.getConfiguration(SETTINGS_SECTION, folder.uri);
-    const existing = configuration.inspect<unknown[]>(Key.targets)?.workspaceFolderValue;
-    const current = Array.isArray(existing) ? existing : [];
+    const layers = configuration.inspect<unknown[]>(Key.targets);
+    const effective = layers?.workspaceFolderValue ?? layers?.workspaceValue ?? layers?.globalValue;
+    const current = Array.isArray(effective) ? effective : [];
     const remaining = current.filter((entry) => {
         const metadata = typeof entry === 'object' && entry !== null ? (entry as Record<string, unknown>).metadata : undefined;
         return metadata !== target.metadata;
