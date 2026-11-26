@@ -18,6 +18,9 @@ export const Command = {
     compareBuilds: 'trueImportCost.compareBuilds',
     showImporters: 'trueImportCost.showImporters',
     clearHistory: 'trueImportCost.clearHistory',
+    measureImport: 'trueImportCost.measureImport',
+    measureStandalone: 'trueImportCost.measureStandalone',
+    forgetMeasurements: 'trueImportCost.forgetMeasurements',
 } as const;
 
 export const View = {

@@ -8,7 +8,7 @@ See what each import really costs **in your production build** — read from the
 
 ## ✨ Features
 
-- **Production-aware sizes** — module sizes come from your bundler: esbuild's `bytesInOutput`, or what Vite, Rollup or Rolldown rendered into each chunk. The VS Code extension never runs a bundler itself
+- **Production-aware sizes** — module sizes come from your bundler: esbuild's `bytesInOutput`, or what Vite, Rollup or Rolldown rendered into each chunk. Hints and hovers are read from your build's metadata, never from a bundler run of their own
 - **Bundled, exclusive and shared, kept apart** — `12.4 kB bundled · 3.1 kB exclusive` says what an import pulls in and how much of it no other import reaches; `· shared` says the build keeps all of it for other imports anyway
 - **Honest about precision** — a `~` marks an estimate. The hover says whether sizes are reported by the bundler, estimated from source maps, rendered lengths, or rendered lengths scaled to the minified chunk
 - **Real shared-module analysis** — sharing comes from the module graph of the build, not from package names, so two imports of different exports from the same package are measured by the modules they actually reach
@@ -24,7 +24,9 @@ See what each import really costs **in your production build** — read from the
 - **Compare builds** — pin a build as the baseline, or pick any metafile or snapshot, and every package, chunk and module shows what changed since
 - **Size budgets** — limits per target for the total, the initial load, JavaScript, CSS, any single import and named packages. An import or package over budget gets a warning where it is imported
 - **Show importers** — from a package or module to every line in your code that imports it
-- **Local and read-only** — no network access, no telemetry, never executes workspace code. Build metadata is validated and size-limited before it is read, and nothing is written to the workspace
+- **Measured marginal cost** — build the target once with and once without an import, or compare two builds of your own, and the hover shows exactly what the build saves without it
+- **Standalone size** — the imported names and the whole package bundled by themselves with your project's bundler, minified and gzipped
+- **Local, and runs nothing unless you ask** — no network access, no telemetry. Hints, hovers and the dashboard only read build metadata, which is validated and size-limited, and nothing is written to the workspace. Measuring an import runs your build only when you ask, in a trusted workspace, after you allow the command
 
 ---
 
@@ -112,8 +114,25 @@ Hover an import for the full picture: the table below, the packages it pulls in,
 | Lazy | Bytes behind dynamic imports | Module graph |
 | Whole package | Retained bytes of every module of the package instance | Build metadata |
 | External, tree-shaken, removed, type-only | No bytes in the bundle, and why | Build metadata and source analysis |
+| Measured | How much smaller the build is without the import | Two builds: with and without it |
+| Standalone | The imported names, and the whole package, bundled by themselves | Your project's esbuild or Rolldown |
 
-Attribution is per module: bundlers report what each **module** contributes, not what each import statement or function does, so a module that several imports reach counts toward each of them. Exclusive bytes assume the rest of the build stays as it is; removing an import can also change minification and chunking. [docs/measurements.md](docs/measurements.md) has the details. A standalone size and a measured marginal cost from differential builds are on the [roadmap](docs/roadmap.md).
+Attribution is per module: bundlers report what each **module** contributes, not what each import statement or function does, so a module that several imports reach counts toward each of them. Exclusive bytes assume the rest of the build stays as it is; removing an import can also change minification and chunking, which only a second build shows: see [Measuring an import](#measuring-an-import). [docs/measurements.md](docs/measurements.md) has the details.
+
+### Measuring an import
+
+Every number above comes from one build. **Measure Import by Building Without It** — from the hover, or with the cursor on an import — builds the target twice, once as your code is and once with the import taken out, and from then on the hover shows the difference:
+
+```text
+Measured · Built without this import, the build is 70 kB smaller, all of it in the initial load · 2 minutes ago
+```
+
+- **It needs the plugin in the build.** The True Import Cost plugin (`@true-import-cost/esbuild`, `/vite` or `/webpack`) takes the import out of that one file while bundling — your files are never changed — keeps the build from writing its output, and writes its reports to a temporary folder in VS Code's storage.
+- **The command** is `trueImportCost.measure.command` for the target or `*`; without one, `npx --no vite build` for a Vite target, or `npm run build` when `package.json` has a `build` script. It runs in the folder of the nearest `package.json`.
+- **It runs only when you ask**, only in a trusted workspace, and only after you allow the command, once or for the workspace. Your build configuration and its plugins run as they do when you build yourself, and anything else the command does still happens: if your build script also deploys or uploads, set `trueImportCost.measure.command` to the bare bundler command.
+- **Without letting the extension run anything:** pin the current build (**Compare Builds**), take the import out and build yourself. When the new build differs from the baseline by exactly that import, the hover shows the difference as measured between the two builds.
+
+**Measure Standalone Size of the Imported Package** bundles the names you import, and the whole package, by themselves with the esbuild or Rolldown installed in the project, for the platform of the target, and shows both sizes minified and gzipped. It does not use your build configuration and writes nothing to your project. **Forget Measured Import Costs** clears every measurement and every command you allowed.
 
 ### Bundle dashboard
 
@@ -157,6 +176,9 @@ Every metadata file is one build target, named after its `target` (snapshots), i
 | **True Import Cost: Compare Builds** | Pin the current build as the baseline, compare with a metafile or snapshot, or clear the baseline |
 | **True Import Cost: Show Importers** | List every line that imports a package or module — the one under the cursor, or one picked in a view — and go to it |
 | **True Import Cost: Clear Build History** | Forget the recorded size history of every target in this workspace |
+| **True Import Cost: Measure Import by Building Without It** | Build the target with and without the import under the cursor, and show the difference in the hover |
+| **True Import Cost: Measure Standalone Size of the Imported Package** | Bundle the imported names and their package by themselves, and show their size in the hover |
+| **True Import Cost: Forget Measured Import Costs** | Forget every measured cost and standalone size, and every command you allowed to run, in this workspace |
 | **True Import Cost: Show Log** | Open the log, which says which metadata was read and why a file was rejected |
 
 The **True Import Cost** activity bar view has **Bundle Contents** (packages and modules of the active target, largest first) and **Why Included**. The status bar shows the active target and its total size; click it to switch targets.
@@ -181,6 +203,8 @@ The **True Import Cost** activity bar view has **Bundle Contents** (packages and
 | `trueImportCost.maxMetadataSizeMB` | `number` | `64` | Largest metadata file that is read; larger ones are rejected unread |
 | `trueImportCost.budgets` | `object` | `{}` | Size budgets per build target; see [Size budgets](#size-budgets) |
 | `trueImportCost.history.enabled` | `boolean` | `true` | Record the size of each new build for the dashboard's history chart |
+| `trueImportCost.measure.command` | `object` | `{}` | The command that builds a target when you measure an import, by target id or `*`; see [Measuring an import](#measuring-an-import) |
+| `trueImportCost.measure.timeoutSeconds` | `number` | `300` | How long one build may take when you measure an import before it is stopped |
 
 An entry of `trueImportCost.targets`:
 
@@ -195,13 +219,13 @@ An entry of `trueImportCost.targets`:
 
 `root` is only needed for a raw esbuild metafile whose paths are relative to a directory True Import Cost cannot work out: by default it tries the metafile's folder and each folder above it, up to the workspace folder, until the paths in the metafile exist.
 
-In Restricted Mode the workspace's own `trueImportCost.targets` and `trueImportCost.maxMetadataSizeMB` are ignored; metadata in `.true-import-cost` folders is still read, and nothing is ever executed.
+In Restricted Mode the workspace's own `trueImportCost.targets`, `trueImportCost.maxMetadataSizeMB` and `trueImportCost.measure.command` are ignored, and measuring imports, which runs the workspace's build or bundler, is not available; metadata in `.true-import-cost` folders is still read.
 
 ---
 
 ## 🔒 Security and privacy
 
-True Import Cost makes no network requests, collects no telemetry and never runs your build, your scripts or your configuration. It reads JSON files and the source of the documents you open. Metadata is size-limited, parsed as data, validated against a strict schema and checked for consistency before it is used; text from it is escaped before it appears in a hover. See [SECURITY.md](SECURITY.md) for the full list and for reporting a vulnerability.
+True Import Cost makes no network requests and collects no telemetry. Hints, hovers, diagnostics and the dashboard read JSON files and the source of your files, and never run your build, your scripts or your configuration. Measuring an import is the one exception: it runs the build command you allowed, when you ask, in a trusted workspace. Metadata is size-limited, parsed as data, validated against a strict schema and checked for consistency before it is used; text from it is escaped before it appears in a hover. See [SECURITY.md](SECURITY.md) for the full list and for reporting a vulnerability.
 
 ---
 

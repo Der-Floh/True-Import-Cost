@@ -57,7 +57,7 @@ describe('StalenessTracker', () => {
         setVirtualFile(PATH, 'changed outside the editor', { mtime: BUILT + 5_000 });
         expect(await isStale(document)).toBe(false);
 
-        document.save();
+        await document.save();
         expect(await isStale(document)).toBe(true);
     });
 

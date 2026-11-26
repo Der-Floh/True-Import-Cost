@@ -183,6 +183,30 @@ export default tseslint.config(
         },
     },
     {
+        // Measuring an import runs the user's build, which takes a child process on the machine that holds the workspace.
+        files: ['src/extension/measure/buildRunner.ts'],
+        rules: {
+            'no-restricted-imports': ['error', {
+                paths: noNodeBuiltins('Use vscode.workspace.fs and vscode.Uri: they work for remote workspaces too.')
+                    .filter(entry => !entry.name.endsWith('child_process')),
+                patterns: [
+                    { group: ['**/plugins/**'], message: 'The bundler plugins are not part of the extension.' },
+                ],
+            }],
+        },
+    },
+    {
+        files: ['src/driver/**/*.ts'],
+        rules: {
+            'no-restricted-imports': ['error', {
+                paths: [noVscode('The drivers run in a Node process of their own, outside VS Code.')],
+                patterns: [
+                    { group: ['**/extension/**', '**/parser', '**/parser/**', '**/plugins/**', '**/webview/**'], message: 'The drivers may depend on src/core only.' },
+                ],
+            }],
+        },
+    },
+    {
         files: ['src/shared/**/*.ts'],
         rules: {
             'no-restricted-imports': ['error', {

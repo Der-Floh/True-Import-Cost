@@ -27,6 +27,8 @@ export interface Settings {
     readonly duplicateDiagnostics: boolean;
     readonly budgets: ReadonlyMap<string, Budget>;
     readonly historyEnabled: boolean;
+    readonly measureCommands: ReadonlyMap<string, string>;
+    readonly measureTimeoutSeconds: number;
 }
 
 export interface FolderSettings {
@@ -50,6 +52,8 @@ const Key = {
     maxMetadataSizeMB: 'maxMetadataSizeMB',
     budgets: 'budgets',
     historyEnabled: 'history.enabled',
+    measureCommand: 'measure.command',
+    measureTimeoutSeconds: 'measure.timeoutSeconds',
 } as const;
 
 const DEFAULT_DEBOUNCE_MS = 300;
@@ -57,6 +61,9 @@ const MAX_DEBOUNCE_MS = 5000;
 const DEFAULT_MAX_METADATA_MB = 64;
 const MAX_METADATA_MB = 1024;
 const MAX_TARGETS = 50;
+const DEFAULT_MEASURE_TIMEOUT_SECONDS = 300;
+const MAX_MEASURE_TIMEOUT_SECONDS = 3600;
+const MAX_COMMAND_LENGTH = 1000;
 
 function readBoolean(configuration: vscode.WorkspaceConfiguration, key: string, fallback: boolean): boolean {
     const value: unknown = configuration.get(key);
@@ -97,6 +104,21 @@ function readTargets(configuration: vscode.WorkspaceConfiguration): TargetSettin
     return targets;
 }
 
+function readCommands(configuration: vscode.WorkspaceConfiguration): Map<string, string> {
+    const value: unknown = configuration.get(Key.measureCommand);
+    const commands = new Map<string, string>();
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+        return commands;
+    }
+    for (const [target, command] of Object.entries(value as Record<string, unknown>).slice(0, MAX_TARGETS)) {
+        const text = optionalText(command);
+        if (target.trim() !== '' && text !== undefined && text.length <= MAX_COMMAND_LENGTH) {
+            commands.set(target.trim(), text);
+        }
+    }
+    return commands;
+}
+
 export function readSettings(): Settings {
     const configuration = vscode.workspace.getConfiguration(SETTINGS_SECTION);
     return {
@@ -113,6 +135,8 @@ export function readSettings(): Settings {
         duplicateDiagnostics: readBoolean(configuration, Key.duplicateDiagnostics, true),
         budgets: parseBudgets(configuration.get(Key.budgets)),
         historyEnabled: readBoolean(configuration, Key.historyEnabled, true),
+        measureCommands: readCommands(configuration),
+        measureTimeoutSeconds: Math.round(readNumber(configuration, Key.measureTimeoutSeconds, DEFAULT_MEASURE_TIMEOUT_SECONDS, 10, MAX_MEASURE_TIMEOUT_SECONDS)),
     };
 }
 

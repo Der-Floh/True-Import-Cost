@@ -37,6 +37,7 @@ export {
     removeVirtualFile,
     setFileReadError,
     setVirtualFile,
+    virtualFilePaths,
     watchedPatterns,
     watcherCount,
 } from './vscode/fileSystem';
@@ -59,16 +60,19 @@ export {
 export type { ProviderKind, ProviderRegistration } from './vscode/languages';
 export { RelativePattern, Uri } from './vscode/uri';
 export {
+    cancelRunningProgress,
     FakeTextEditor,
     flushErrorMessages,
     flushInformationMessages,
     flushInputBoxes,
     flushLogs,
     flushOpenDialogs,
+    flushProgress,
     flushQuickPicks,
     flushShownDocuments,
     flushWarningMessages,
     outputChannels,
+    ProgressLocation,
     QuickPickItemKind,
     setActiveTextEditor,
     setInputBoxAnswer,
@@ -80,7 +84,7 @@ export {
     treeViews,
     window,
 } from './vscode/window';
-export type { InputBoxOptions, QuickPickItemLike, QuickPickRecord } from './vscode/window';
+export type { InputBoxOptions, ProgressRecord, QuickPickItemLike, QuickPickRecord } from './vscode/window';
 export { FakeWebview, FakeWebviewPanel, ViewColumn, webviewPanels } from './vscode/webview';
 export type { WebviewPanelOptions } from './vscode/webview';
 export { flushFileSearches, setWorkspaceTrusted, workspace } from './vscode/workspace';

@@ -161,10 +161,11 @@ export class FakeTextDocument {
         changed.fire({ document: this, contentChanges: [{ range, rangeOffset: 0, rangeLength, text }], reason: undefined });
     }
 
-    public save(): void {
+    public save(): Promise<boolean> {
         setVirtualFile(this.uri.path, this.text);
         this.isDirty = false;
         saved.fire(this);
+        return Promise.resolve(true);
     }
 
     private lineStarts(): number[] {

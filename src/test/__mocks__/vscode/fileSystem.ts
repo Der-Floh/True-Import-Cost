@@ -71,6 +71,17 @@ export const fs = {
         return Promise.resolve();
     },
     createDirectory: (_uri: Uri): Promise<void> => Promise.resolve(),
+    readDirectory: (uri: Uri): Promise<[string, number][]> => {
+        const prefix = uri.path.endsWith('/') ? uri.path : `${uri.path}/`;
+        const entries = new Map<string, number>();
+        for (const path of files.keys()) {
+            if (path.startsWith(prefix)) {
+                const [name, ...rest] = path.slice(prefix.length).split('/');
+                entries.set(name as string, rest.length > 0 ? FileType.Directory : FileType.File);
+            }
+        }
+        return entries.size === 0 ? Promise.reject(notFound(uri)) : Promise.resolve([...entries].sort((a, b) => a[0].localeCompare(b[0])));
+    },
     delete: (uri: Uri, options: { readonly recursive?: boolean } = {}): Promise<void> => {
         const prefix = uri.path.endsWith('/') ? uri.path : `${uri.path}/`;
         const nested = [...files.keys()].filter(path => path.startsWith(prefix));

@@ -274,7 +274,7 @@ describe('documents', () => {
         expect(document.lineCount).toBe(4);
     });
 
-    it('reports an edit, a save and a close, and keeps the open documents listed', () => {
+    it('reports an edit, a save and a close, and keeps the open documents listed', async () => {
         const seen: string[] = [];
         vscode.workspace.onDidChangeTextDocument(event => seen.push(`changed ${event.document.version} ${event.contentChanges.length}`));
         vscode.workspace.onDidSaveTextDocument(document => seen.push(`saved ${document.isDirty}`));
@@ -283,7 +283,7 @@ describe('documents', () => {
 
         document.edit('b');
         expect(document.isDirty).toBe(true);
-        document.save();
+        await document.save();
         closeDocument(document);
 
         expect(seen).toEqual(['changed 2 1', 'saved false', 'closed /w/src/a.ts']);

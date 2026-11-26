@@ -21,6 +21,7 @@ jobs:
       required-files: |
         out/extension.js
         out/parser.js
+        out/standalone.js
         public/dashboard.js
         public/dashboard.css
         media/dashboard.html

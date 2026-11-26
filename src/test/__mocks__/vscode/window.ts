@@ -1,4 +1,4 @@
-import { hostEvent } from './events';
+import { CancellationTokenSource, hostEvent } from './events';
 import { FakeTextDocument, openDocument, Position, Selection, textDocuments } from './documents';
 import { readVirtualFile } from './fileSystem';
 import { type Uri } from './uri';
@@ -9,6 +9,17 @@ import type { Disposable } from './events';
 import type { Range } from './documents';
 
 export const StatusBarAlignment = { Left: 1, Right: 2 } as const;
+
+export const ProgressLocation = { SourceControl: 1, Window: 10, Notification: 15 } as const;
+
+export interface ProgressRecord {
+    readonly title: string | undefined;
+    readonly cancellable: boolean;
+    readonly messages: string[];
+}
+
+let progressRecords: ProgressRecord[] = [];
+let runningProgress: CancellationTokenSource | undefined;
 
 export const QuickPickItemKind = { Separator: -1, Default: 0 } as const;
 
@@ -219,7 +230,32 @@ export const window = {
         return Promise.resolve(activeEditor);
     },
     createWebviewPanel,
+    withProgress: async <T>(
+        options: { readonly title?: string; readonly cancellable?: boolean },
+        task: (progress: { report(value: { readonly message?: string }): void }, token: CancellationTokenSource['token']) => Promise<T>,
+    ): Promise<T> => {
+        const record: ProgressRecord = { title: options.title, cancellable: options.cancellable === true, messages: [] };
+        progressRecords.push(record);
+        const source = new CancellationTokenSource();
+        runningProgress = source;
+        try {
+            return await task({ report: value => (value.message === undefined ? undefined : record.messages.push(value.message)) }, source.token);
+        } finally {
+            if (runningProgress === source) {
+                runningProgress = undefined;
+            }
+            source.dispose();
+        }
+    },
 };
+
+export function flushProgress(): ProgressRecord[] {
+    return progressRecords.splice(0);
+}
+
+export function cancelRunningProgress(): void {
+    runningProgress?.cancel();
+}
 
 export function openTextDocument(target: Uri): Promise<FakeTextDocument> {
     return Promise.resolve(documentFor(target));
@@ -312,4 +348,6 @@ export function resetWindow(): void {
     openDialogAnswer = undefined;
     warningAnswer = undefined;
     shownDocuments = [];
+    progressRecords = [];
+    runningProgress = undefined;
 }

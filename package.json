@@ -38,10 +38,11 @@
     "capabilities": {
         "untrustedWorkspaces": {
             "supported": "limited",
-            "description": "In Restricted Mode the workspace's own trueImportCost.targets and trueImportCost.maxMetadataSizeMB are ignored; build metadata in .true-import-cost folders is still read, and nothing is ever executed.",
+            "description": "In Restricted Mode the workspace's own trueImportCost.targets, trueImportCost.maxMetadataSizeMB and trueImportCost.measure.command are ignored, and measuring an import, which runs the workspace's build, is not available; build metadata in .true-import-cost folders is still read.",
             "restrictedConfigurations": [
                 "trueImportCost.targets",
-                "trueImportCost.maxMetadataSizeMB"
+                "trueImportCost.maxMetadataSizeMB",
+                "trueImportCost.measure.command"
             ]
         },
         "virtualWorkspaces": false
@@ -64,6 +65,7 @@
         "media/dashboard.html",
         "out/extension.js",
         "out/parser.js",
+        "out/standalone.js",
         "public/dashboard.js",
         "public/dashboard.css"
     ],
@@ -130,6 +132,22 @@
                 "command": "trueImportCost.clearHistory",
                 "title": "Clear Build History",
                 "category": "True Import Cost"
+            },
+            {
+                "command": "trueImportCost.measureImport",
+                "title": "Measure Import by Building Without It",
+                "category": "True Import Cost",
+                "icon": "$(beaker)"
+            },
+            {
+                "command": "trueImportCost.measureStandalone",
+                "title": "Measure Standalone Size of the Imported Package",
+                "category": "True Import Cost"
+            },
+            {
+                "command": "trueImportCost.forgetMeasurements",
+                "title": "Forget Measured Import Costs",
+                "category": "True Import Cost"
             }
         ],
         "menus": {
@@ -141,6 +159,14 @@
                 {
                     "command": "trueImportCost.showImporters",
                     "when": "editorLangId =~ /^(javascript|javascriptreact|typescript|typescriptreact|vue)$/"
+                },
+                {
+                    "command": "trueImportCost.measureImport",
+                    "when": "isWorkspaceTrusted && editorLangId =~ /^(javascript|javascriptreact|typescript|typescriptreact|vue)$/"
+                },
+                {
+                    "command": "trueImportCost.measureStandalone",
+                    "when": "isWorkspaceTrusted && editorLangId =~ /^(javascript|javascriptreact|typescript|typescriptreact|vue)$/"
                 }
             ],
             "view/title": [
@@ -370,6 +396,23 @@
                     "type": "boolean",
                     "default": true,
                     "markdownDescription": "Record the size of each new build of each target, for the history chart of the dashboard. The history is kept in VS Code's storage for this workspace, never in the workspace itself.",
+                    "scope": "window"
+                },
+                "trueImportCost.measure.command": {
+                    "type": "object",
+                    "default": {},
+                    "additionalProperties": {
+                        "type": "string"
+                    },
+                    "markdownDescription": "The command that builds each target when you measure an import, keyed by build target id; `*` applies to every target. Without one, True Import Cost runs `npx --no vite build` for Vite targets and `npm run build` for other targets whose `package.json` has a `build` script, in the folder of the nearest `package.json`. The command runs only when you measure an import, in a trusted workspace, after you allow it. Example: `{ \"extension-host\": \"node esbuild.mjs --production\" }`.",
+                    "scope": "resource"
+                },
+                "trueImportCost.measure.timeoutSeconds": {
+                    "type": "number",
+                    "default": 300,
+                    "minimum": 10,
+                    "maximum": 3600,
+                    "markdownDescription": "How long one build may take when you measure an import before True Import Cost stops it.",
                     "scope": "window"
                 }
             }

@@ -4,6 +4,9 @@ import { registerCommands } from './commands';
 import { compareWithFile } from './commands/compareBuilds';
 import { DOCUMENT_SELECTOR, View } from './constants';
 import { DashboardPanel } from './dashboard/dashboardPanel';
+import { runBuild } from './measure/buildRunner';
+import { ImportMeasurer } from './measure/importMeasurer';
+import { StandaloneMeasurer, StandaloneSizes } from './measure/standaloneSizes';
 import { BundleDiagnostics, DuplicatePackageQuickFix } from './providers/diagnostics';
 import { ImportCostHover } from './providers/hover';
 import { ImportCostInlayHints } from './providers/inlayHints';
@@ -13,6 +16,7 @@ import { ExtensionStorage } from './services/extensionStorage';
 import { HistoryStore } from './services/historyStore';
 import { ImportCostService } from './services/importCosts';
 import { Logger } from './services/logger';
+import { MeasurementStore } from './services/measurementStore';
 import { affectsMetadataLocation, affectsSettings, readSettings } from './services/settings';
 import { SnapshotStore } from './services/snapshotStore';
 import { StalenessTracker } from './services/staleness';
@@ -21,6 +25,7 @@ import { CurrentTarget } from './views/currentTarget';
 import { PackagesTreeProvider } from './views/packagesTree';
 import { TargetStatusBar } from './views/statusBar';
 import { WhyIncludedTreeProvider } from './views/whyIncludedTree';
+import { measureComparedBuilds, singleImportChange } from '../core/measurement';
 
 import type { Settings } from './services/settings';
 import type { PackagesNode } from './views/packagesTree';
@@ -42,6 +47,9 @@ export class TrueImportCost implements vscode.Disposable {
     private readonly baselines: BaselineStore;
     private readonly history: HistoryStore;
     private readonly dashboard: DashboardPanel;
+    private readonly measurements: MeasurementStore;
+    private readonly standaloneSizes: StandaloneSizes;
+    private readonly comparedBuilds = new Set<string>();
     private shownTargetKey: string | undefined;
 
     public constructor(context: vscode.ExtensionContext) {
@@ -59,6 +67,26 @@ export class TrueImportCost implements vscode.Disposable {
         const storage = new ExtensionStorage(context);
         this.baselines = new BaselineStore(storage);
         this.history = new HistoryStore(storage);
+        this.measurements = new MeasurementStore(storage);
+        const measurer = new ImportMeasurer({
+            store: this.store,
+            service: this.service,
+            measurements: this.measurements,
+            storage,
+            state: context.workspaceState,
+            settings,
+            runBuild,
+        });
+        this.standaloneSizes = new StandaloneSizes(storage);
+        const standalone = new StandaloneMeasurer({
+            store: this.store,
+            service: this.service,
+            sizes: this.standaloneSizes,
+            storage,
+            state: context.workspaceState,
+            extensionUri: context.extensionUri,
+            runBuild,
+        });
         this.statusBar = new TargetStatusBar(this.store, this.current, settings, this.baselines);
         this.packages = new PackagesTreeProvider(this.current);
         this.whyIncluded = new WhyIncludedTreeProvider();
@@ -89,6 +117,10 @@ export class TrueImportCost implements vscode.Disposable {
             whyIncludedView,
             this.baselines,
             this.history,
+            this.measurements,
+            this.standaloneSizes,
+            measurer,
+            standalone,
             this.dashboard,
             vscode.languages.registerInlayHintsProvider(DOCUMENT_SELECTOR, this.inlayHints),
             vscode.languages.registerHoverProvider(DOCUMENT_SELECTOR, new ImportCostHover(this.service, settings)),
@@ -104,6 +136,11 @@ export class TrueImportCost implements vscode.Disposable {
                 settings,
                 baselines: this.baselines,
                 history: this.history,
+                measurer,
+                measurements: this.measurements,
+                standalone,
+                standaloneSizes: this.standaloneSizes,
+                workspaceState: context.workspaceState,
                 refresh: () => this.reload(),
                 clearCache: () => this.clearCache(),
                 showDashboard: targetKey => this.dashboard.show(targetKey),
@@ -111,9 +148,11 @@ export class TrueImportCost implements vscode.Disposable {
             this.store.onDidChange(() => {
                 this.staleness.clear();
                 this.recordHistory();
+                this.recordComparedBuilds();
                 this.updateAll(true);
             }),
             this.baselines.onDidChange(() => {
+                this.recordComparedBuilds();
                 this.statusBar.update();
                 this.dashboard.refresh();
             }),
@@ -168,6 +207,23 @@ export class TrueImportCost implements vscode.Disposable {
             this.history.record(target).catch((error: unknown) => {
                 Logger.warn(`Could not record the size history of "${target.id}": ${error instanceof Error ? error.message : String(error)}`);
             });
+        }
+    }
+
+    private recordComparedBuilds(): void {
+        for (const target of this.store.targets()) {
+            const baseline = this.baselines.peek(target.key);
+            const pair = baseline === undefined ? undefined : [target.key, baseline.graph.snapshot.id, baseline.savedAt, target.fingerprint].join('\u0001');
+            if (baseline === undefined || pair === undefined || this.comparedBuilds.has(pair)) {
+                continue;
+            }
+            this.comparedBuilds.add(pair);
+            const change = singleImportChange(baseline.graph, target.graph);
+            if (change !== undefined) {
+                this.measurements.record(target.key, measureComparedBuilds(baseline.graph, target.graph, change, Date.now())).catch((error: unknown) => {
+                    Logger.warn(`Could not record the measured cost of ${change.specifier}: ${error instanceof Error ? error.message : String(error)}`);
+                });
+            }
         }
     }
 

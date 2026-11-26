@@ -4,6 +4,8 @@ import { analyzeVue } from './vue';
 import type { AnalyzeOptions, DocumentAnalysis, ScriptLanguage } from './types';
 
 export type { AnalyzeOptions, BindingUsage, DocumentAnalysis, MemberUsage, SourceImport, SourceImportKind, TextRange } from './types';
+export { planRemoval } from './removal';
+export type { PlannedRemoval } from './removal';
 
 const LANGUAGE_IDS: Readonly<Record<string, ScriptLanguage | 'vue'>> = {
     typescript: 'ts',

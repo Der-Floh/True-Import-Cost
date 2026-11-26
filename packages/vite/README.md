@@ -34,6 +34,16 @@ After every `vite build` the plugin writes `.true-import-cost/webview.json` in V
 
 The folder gets a `.gitignore` the first time it is created, since a snapshot describes one machine's build. Delete it to commit snapshots.
 
+## Measuring an import
+
+When you ask True Import Cost to measure an import, it runs your build twice with the environment variable `TRUE_IMPORT_COST_MEASURE` set, once as is and once with the import taken out. While that variable is set, the plugin:
+
+- takes the import out of that one file in memory; the file on disk stays unchanged
+- writes no build output
+- writes its snapshot to a temporary folder instead of `outDir`
+
+Builds without the variable are not affected.
+
 ## How sizes are measured
 
 Rollup and Rolldown report how long each module was when it was rendered into its chunk, which is before minification. The plugin therefore:

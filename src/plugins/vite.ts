@@ -1,5 +1,7 @@
+import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 
+import { readMeasureRequest, SourceEdits, writeMeasureReport } from './measure';
 import { addPackageVersions, DEFAULT_OUT_DIR, describeError, PLUGIN_NAME, sanitizeTarget, snapshotRoot, toPosix, writeSnapshot } from './shared';
 import { isCssModuleId, normalizeRollupBuild, ROLLUP_BUILD_FORMAT } from '../core/adapters/rollup';
 
@@ -89,19 +91,42 @@ function engineOf(meta: PluginContextLike['meta']): string | undefined {
     return meta?.rollupVersion === undefined ? undefined : `rollup ${meta.rollupVersion}`;
 }
 
+function editedSourceLoader(edits: SourceEdits): Pick<Plugin, 'load'> {
+    return {
+        load: {
+            order: 'pre',
+            filter: { id: edits.filter() },
+            async handler(id) {
+                return edits.has(id) ? edits.apply(id, await readFile(id, 'utf8')) : null;
+            },
+        },
+    };
+}
+
 export function trueImportCost(options: TrueImportCostOptions = {}): Plugin {
     let config: ResolvedConfig | undefined;
     const cssSourceLengths = new Map<string, number>();
     let primaryFormat: string | undefined;
+    const request = readMeasureRequest();
+    const edits = request === undefined ? undefined : new SourceEdits(request.edits);
 
     return {
         name: PLUGIN_NAME,
         apply: 'build',
         enforce: 'post',
 
+        config() {
+            return request === undefined ? undefined : { build: { write: false } };
+        },
+
         configResolved(resolved) {
             config = resolved;
+            if (request !== undefined && resolved.build.write) {
+                throw new Error('True Import Cost is measuring this build, but another plugin turned writing the output back on, so the build stops instead.');
+            }
         },
+
+        ...(edits !== undefined && edits.size > 0 ? editedSourceLoader(edits) : {}),
 
         buildStart() {
             cssSourceLengths.clear();
@@ -131,7 +156,7 @@ export function trueImportCost(options: TrueImportCostOptions = {}): Plugin {
                 const outputDir = outputOptions.dir ?? (outputOptions.file === undefined ? path.resolve(root, 'dist') : path.dirname(outputOptions.file));
                 primaryFormat ??= outputOptions.format;
                 const fileName = options.fileName ?? (outputOptions.format === primaryFormat ? `${target}.json` : `${target}.${outputOptions.format}.json`);
-                const file = path.resolve(root, options.outDir ?? DEFAULT_OUT_DIR, fileName);
+                const file = path.resolve(request?.outDir ?? path.resolve(root, options.outDir ?? DEFAULT_OUT_DIR), fileName);
 
                 try {
                     const items = Object.values(bundle) as unknown as (OutputChunkLike | OutputAssetLike)[];
@@ -172,6 +197,9 @@ export function trueImportCost(options: TrueImportCostOptions = {}): Plugin {
                         mode: config?.mode === 'development' ? 'development' : 'production',
                     });
                     await writeSnapshot(file, await addPackageVersions(snapshot, root));
+                    if (edits !== undefined) {
+                        await writeMeasureReport(file, edits.report(target));
+                    }
                 } catch (error: unknown) {
                     context.warn(`Could not write the True Import Cost snapshot: ${describeError(error)}`);
                 }

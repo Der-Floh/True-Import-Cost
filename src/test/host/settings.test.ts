@@ -39,6 +39,8 @@ describe('readSettings', () => {
             duplicateDiagnostics: declared['trueImportCost.diagnostics.duplicatePackages'].default,
             budgets: new Map(),
             historyEnabled: declared['trueImportCost.history.enabled'].default,
+            measureCommands: new Map(Object.entries(declared['trueImportCost.measure.command'].default)),
+            measureTimeoutSeconds: declared['trueImportCost.measure.timeoutSeconds'].default,
         });
     });
 
@@ -54,6 +56,8 @@ describe('readSettings', () => {
         setSetting('trueImportCost.diagnostics.duplicatePackages', false);
         setSetting('trueImportCost.budgets', { webview: { initial: '600 kB', packages: { moment: 0 } } });
         setSetting('trueImportCost.history.enabled', false);
+        setSetting('trueImportCost.measure.command', { 'extension-host': ' node esbuild.mjs ', webview: '', '*': 42 });
+        setSetting('trueImportCost.measure.timeoutSeconds', 5);
 
         expect(readSettings()).toEqual({
             enabled: false,
@@ -64,6 +68,8 @@ describe('readSettings', () => {
             duplicateDiagnostics: false,
             budgets: new Map([['webview', { initial: 600_000, packages: new Map([['moment', 0]]) }]]),
             historyEnabled: false,
+            measureCommands: new Map([['extension-host', 'node esbuild.mjs']]),
+            measureTimeoutSeconds: 10,
         });
     });
 

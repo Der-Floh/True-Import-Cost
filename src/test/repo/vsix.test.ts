@@ -11,12 +11,13 @@ const SHIPS = [
     'media/dashboard.html',
     'out/extension.js',
     'out/parser.js',
+    'out/standalone.js',
     'package.json',
     'public/dashboard.css',
     'public/dashboard.js',
 ];
 
-const BUILT = ['out/extension.js', 'out/parser.js', 'public/dashboard.js', 'public/dashboard.css'];
+const BUILT = ['out/extension.js', 'out/parser.js', 'out/standalone.js', 'public/dashboard.js', 'public/dashboard.css'];
 
 let files: readonly string[] = [];
 
