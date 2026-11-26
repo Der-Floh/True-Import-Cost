@@ -46,12 +46,13 @@ function withoutExtension(path: string): string {
     return dot <= 0 ? path : path.slice(0, path.length - (name.length - dot));
 }
 
-function subpathScore(pathInPackage: string, subpath: string): number {
+function subpathScore(pathInPackage: string, subpath: string, packageName: string): number {
     const stem = withoutExtension(pathInPackage);
     if (subpath === '') {
         const depth = stem.split('/').length - 1;
         const name = basename(stem);
-        return 50 - depth * 5 + (name === 'index' || name === 'main' ? 10 : 0);
+        const mainLike = name === 'index' || name === 'main' || name === basename(packageName);
+        return 50 - depth * 5 + (mainLike ? 10 : 0);
     }
     const wanted = withoutExtension(subpath);
     if (stem === wanted || stem === `${wanted}/index`) {
@@ -118,7 +119,7 @@ export function matchImport(
             for (const edge of packageEdges) {
                 const module = graph.module(edge.resolvedModule as string);
                 const inPackage = module?.packageRoot === undefined ? module?.path ?? '' : relativePath(module.packageRoot, module.path);
-                const score = subpathScore(inPackage, parts.subpath) + (hint !== undefined && edge.kind === hint ? 1 : 0);
+                const score = subpathScore(inPackage, parts.subpath, parts.packageName) + (hint !== undefined && edge.kind === hint ? 1 : 0);
                 if (score > bestScore) {
                     best = edge;
                     bestScore = score;

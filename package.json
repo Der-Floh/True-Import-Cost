@@ -61,7 +61,8 @@
         "CHANGELOG.md",
         "assets/icon-x512.png",
         "assets/activity-bar.svg",
-        "out/extension.js"
+        "out/extension.js",
+        "out/parser.js"
     ],
     "contributes": {
         "commands": [
@@ -277,6 +278,8 @@
         "bundle": "node esbuild.mjs",
         "bundle:production": "node esbuild.mjs --production",
         "bundle:packages": "node scripts/buildPackages.mjs",
+        "fixtures": "run-s bundle:packages fixtures:build",
+        "fixtures:build": "node scripts/buildFixtures.mjs",
         "compile-tests": "node esbuild.mjs --tests",
         "watch": "npm-run-all -p watch:*",
         "watch:esbuild": "node esbuild.mjs --watch",

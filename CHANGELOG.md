@@ -1,0 +1,33 @@
+# Changelog
+
+All notable changes to True Import Cost are documented here. The extension and the two bundler plugins share this file; plugin entries name their package.
+
+## 0.1.0
+
+The first release. It covers milestones v0.1 to v0.3 of the [roadmap](docs/roadmap.md): the core extension, Vite and Vue support, and the dependency graph.
+
+### Extension
+
+- Inline import costs read from build metadata: raw esbuild metafiles and True Import Cost snapshots, found in any `.true-import-cost` folder or listed in `trueImportCost.targets`
+- Bundled, exclusive, shared and lazy bytes per import, from the build's module graph; the whole package's size in the hover
+- External, tree-shaken, removed (unused), type-only and unrecorded imports each get their own label
+- Estimates are marked with `~`, and the hover names the precision of every size and how the import was matched to the build
+- Import analysis with the TypeScript compiler API: every static, dynamic, `require`, `import =` and re-export form; usage by symbol, so shadowed names never count
+- Vue single-file components: `<script>` and `<script setup>` in place, and template-only use of components and directives
+- Build targets: one per metadata file, a target picker, per-target costs in the hover
+- Explain Why Included: import chains from the entry points to a module or package, in the Why Included view
+- Duplicate-package diagnostics with a quick fix that explains each copy
+- Bundle Contents view and a status bar item for the active target
+- Stale detection: hints say `source changed` once a file is newer than its build
+- Watching: metadata files are re-read when the build writes them, and the last good snapshot stays when a file cannot be read
+- Restricted Mode support; no network access, no telemetry, nothing executed
+
+### `@true-import-cost/esbuild` 0.1.0
+
+- Turns on the metafile and writes a normalised snapshot with the esbuild version, the build mode and package versions after every successful build
+
+### `@true-import-cost/vite` 0.1.0
+
+- Writes a snapshot after every production build, for Rollup-based Vite and Rolldown-based Vite 8
+- Per-module sizes from rendered lengths scaled to the minified chunk, or from the source maps when the build writes them
+- CSS split across the stylesheets and Vue style blocks that produced it; emitted assets attributed to the modules they came from

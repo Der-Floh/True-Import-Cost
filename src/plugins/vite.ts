@@ -92,7 +92,7 @@ function engineOf(meta: PluginContextLike['meta']): string | undefined {
 export function trueImportCost(options: TrueImportCostOptions = {}): Plugin {
     let config: ResolvedConfig | undefined;
     const cssSourceLengths = new Map<string, number>();
-    let outputs = 0;
+    let primaryFormat: string | undefined;
 
     return {
         name: PLUGIN_NAME,
@@ -105,7 +105,10 @@ export function trueImportCost(options: TrueImportCostOptions = {}): Plugin {
 
         buildStart() {
             cssSourceLengths.clear();
-            outputs = 0;
+        },
+
+        closeBundle() {
+            primaryFormat = undefined;
         },
 
         transform: {
@@ -126,8 +129,8 @@ export function trueImportCost(options: TrueImportCostOptions = {}): Plugin {
                 const root = toPosix(path.resolve(config?.root ?? process.cwd()));
                 const target = sanitizeTarget(options.target ?? path.basename(root));
                 const outputDir = outputOptions.dir ?? (outputOptions.file === undefined ? path.resolve(root, 'dist') : path.dirname(outputOptions.file));
-                const index = outputs++;
-                const fileName = options.fileName ?? (index === 0 ? `${target}.json` : `${target}.${outputOptions.format}.json`);
+                primaryFormat ??= outputOptions.format;
+                const fileName = options.fileName ?? (outputOptions.format === primaryFormat ? `${target}.json` : `${target}.${outputOptions.format}.json`);
                 const file = path.resolve(root, options.outDir ?? DEFAULT_OUT_DIR, fileName);
 
                 try {

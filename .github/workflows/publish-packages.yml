@@ -1,0 +1,51 @@
+name: Publish npm packages
+
+on:
+  workflow_dispatch:
+    inputs:
+      package:
+        description: Bundler plugin to publish
+        required: true
+        type: choice
+        options:
+          - esbuild
+          - vite
+
+concurrency:
+  group: npm-publish-${{ inputs.package }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Publish @true-import-cost/${{ inputs.package }}
+    runs-on: ubuntu-latest
+    environment: npm
+
+    # Trusted publishing: npm exchanges the job's OIDC token for the right to publish and adds provenance
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check
+        run: npm run ci:check
+
+      - name: Publish
+        working-directory: packages/${{ inputs.package }}
+        run: npm publish --provenance --access public

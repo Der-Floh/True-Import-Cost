@@ -1,3 +1,4 @@
+import { toQuery } from './importQuery';
 import { documentPathIn } from './snapshotStore';
 import { attributeImport, locateDocument } from '../../core/attribution/attribute';
 
@@ -6,9 +7,11 @@ import type { LoadedTarget } from './metadataLoader';
 import type { SnapshotStore } from './snapshotStore';
 import type { StalenessTracker } from './staleness';
 import type { TargetSelection } from './targetSelection';
-import type { ImportCost, ImportQuery } from '../../core/attribution/attribute';
+import type { ImportCost } from '../../core/attribution/attribute';
 import type { DocumentAnalysis, SourceImport } from '../../parser';
 import type * as vscode from 'vscode';
+
+export { toQuery } from './importQuery';
 
 export interface ImportCostEntry {
     readonly source: SourceImport;
@@ -21,21 +24,6 @@ export interface DocumentCosts {
     readonly entries: readonly ImportCostEntry[];
     readonly analysis: DocumentAnalysis;
     readonly stale: boolean;
-}
-
-export function toQuery(source: SourceImport): ImportQuery {
-    const kind = source.kind === 'dynamic'
-        ? 'dynamic'
-        : source.kind === 'require' || source.kind === 'import-equals'
-            ? 'require'
-            : source.kind === 're-export' || source.kind === 'export-all' ? 're-export' : 'static';
-    return {
-        specifier: source.specifier,
-        kind,
-        typeOnly: source.typeOnly,
-        sideEffectOnly: source.kind === 'side-effect',
-        ...(source.hasValueUsage === undefined ? {} : { hasValueUsage: source.hasValueUsage }),
-    };
 }
 
 export class ImportCostService {
