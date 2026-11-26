@@ -1,6 +1,8 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
+import { COMMANDS, OPTIONS, OUTPUT_FORMATS } from '../../cli/arguments';
+
 interface Manifest {
     readonly version: string;
     readonly contributes: {
@@ -46,6 +48,17 @@ describe('the plugin packages', () => {
 
         expect(options.length).toBeGreaterThan(0);
         expect(options.filter(option => !packageReadme.includes(`\`${option}\``))).toEqual([]);
+    });
+});
+
+describe('the CLI package', () => {
+    it('documents every command, option and output format the CLI accepts', () => {
+        const cliReadme = readFileSync('packages/cli/README.md', 'utf8');
+        const commands = Object.keys(COMMANDS).filter(command => !cliReadme.includes(`true-import-cost ${command}`));
+        const options = OPTIONS.filter(option => !cliReadme.includes(`\`--${option}\``));
+        const formats = OUTPUT_FORMATS.filter(format => !cliReadme.includes(`\`${format}\``));
+
+        expect([...commands, ...options, ...formats]).toEqual([]);
     });
 });
 

@@ -4,12 +4,13 @@ on:
   workflow_dispatch:
     inputs:
       package:
-        description: Bundler plugin to publish
+        description: Package to publish
         required: true
         type: choice
         options:
           - esbuild
           - vite
+          - cli
 
 concurrency:
   group: npm-publish-${{ inputs.package }}

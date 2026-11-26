@@ -47,7 +47,7 @@ Each release produces something useful on its own. Version 0.1.0 covers the firs
 - [ ] Compare two user-generated builds as a measured marginal cost
 - [ ] Automated counterfactual builds for safely identifiable cases, behind Workspace Trust and explicit consent
 - [ ] Webpack and Rspack adapters
-- [ ] A CLI for CI pipelines
+- [x] A CLI for CI pipelines (`@true-import-cost/cli`: summary, compare, budget check)
 
 ## v1.0 — Stable release
 

@@ -58,6 +58,15 @@ export default defineConfig({
                     testTimeout: 60_000,
                 },
             },
+            {
+                test: {
+                    name: 'cli',
+                    environment: 'node',
+                    include: ['src/test/cli/**/*.test.ts'],
+                    testTimeout: 60_000,
+                    hookTimeout: 60_000,
+                },
+            },
         ],
     },
 });

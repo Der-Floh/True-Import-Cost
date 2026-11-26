@@ -138,11 +138,11 @@ export default tseslint.config(
         rules: {
             'no-restricted-imports': ['error', {
                 paths: [
-                    ...noNodeBuiltins('src/core runs in the extension host, in the bundler plugins and later in a CLI: use web-standard APIs only.'),
-                    noVscode('src/core must not import vscode, so the bundler plugins and a CLI can reuse it.'),
+                    ...noNodeBuiltins('src/core runs in the extension host, in the bundler plugins and in the CLI: use web-standard APIs only.'),
+                    noVscode('src/core must not import vscode, so the bundler plugins and the CLI can reuse it.'),
                 ],
                 patterns: [
-                    { group: ['**/parser', '**/parser/**', '**/extension/**', '**/plugins/**'], message: 'src/core is the bottom layer and imports nothing above it.' },
+                    { group: ['**/parser', '**/parser/**', '**/extension/**', '**/plugins/**', '**/cli/**'], message: 'src/core is the bottom layer and imports nothing above it.' },
                 ],
             }],
         },
@@ -243,6 +243,19 @@ export default tseslint.config(
                 ],
                 patterns: [
                     { group: ['**/extension/**', '**/parser', '**/parser/**'], message: 'The bundler plugins may depend on src/core only.' },
+                ],
+            }],
+        },
+    },
+    {
+        files: ['src/cli/**/*.ts'],
+        rules: {
+            'no-restricted-imports': ['error', {
+                paths: [
+                    noVscode('The CLI runs in CI pipelines, where vscode does not exist.'),
+                ],
+                patterns: [
+                    { group: ['**/extension/**', '**/parser', '**/parser/**', '**/plugins/**', '**/shared/**', '**/webview/**', '**/driver/**'], message: 'The CLI may depend on src/core only.' },
                 ],
             }],
         },

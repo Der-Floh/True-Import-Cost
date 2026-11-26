@@ -19,10 +19,11 @@ Vite build ─────► @true-import-cost/vite ─────► snapshot
 
 | Layer | Path | May import | Runs in |
 | --- | --- | --- | --- |
-| Core | `src/core` | nothing above it; no `vscode`, no Node built-ins | the extension host, both bundler plugins, a future CLI |
+| Core | `src/core` | nothing above it; no `vscode`, no Node built-ins | the extension host, both bundler plugins, the CLI |
 | Parser | `src/parser` | core | the extension host, loaded lazily from `out/parser.js` |
 | Extension | `src/extension` | core; the parser's types, and its code only through `services/parserHost.ts` | the extension host |
 | Bundler plugins | `src/plugins` | core and Node built-ins | the user's build |
+| CLI | `src/cli` | core and Node built-ins | CI pipelines, as `@true-import-cost/cli` |
 | Shared contract | `src/shared` | core types only | the extension host and the dashboard |
 | Dashboard | `src/webview` | `src/shared` and pure core modules | the dashboard webview |
 
@@ -61,6 +62,10 @@ TypeScript and the Vue compiler are several megabytes, so the parser is its own 
 - **Providers and views** — inlay hints, hover, duplicate-package and budget diagnostics, the status bar, Bundle Contents and Why Included.
 - **Dashboard** — `dashboard/dashboardModel.ts` turns a target, its baseline, its history and its budget into the plain JSON model of `src/shared/dashboard.ts`; `dashboard/dashboardPanel.ts` owns the webview panel, posts the model and acts on the messages of `src/shared/messages.ts` after checking them. The page is a Vue 3 app in `src/webview`, built by Vite into one script that `media/dashboard.html` loads under a nonce-based content security policy. It renders the model as text only: icons come from a fixed set of codicons, and a test makes sure no other HTML is ever inserted. The treemap is a squarified layout (`treemap/squarify.ts`) that shows one level at a time and folds tiles too small to see (`treemap/nodes.ts`); the history chart's scales are in `chart/scales.ts`.
 - **Comparison and history** — `core/compare.ts` compares two builds by package, chunk and module. A chunk is matched by its entry module, or else by its file name without the content hash; chunks that share such a name, like esbuild's `chunk-<hash>.js`, are paired by the modules they hold. `core/chunks.ts` decides what loads initially; `core/budgets.ts` reads and checks budgets. Baselines and history entries are stored as JSON in the extension's storage by `services/baselineStore.ts` and `services/historyStore.ts`.
+
+## CLI
+
+`src/cli` is the `true-import-cost` command, published as `@true-import-cost/cli`: one CommonJS file without dependencies, built by `scripts/buildPackages.mjs`. `metadata.ts` loads a file as `metadataLoader.ts` does, with Node's `fs` in place of `vscode.workspace.fs`; `reports/` turns one or two build graphs into plain JSON reports with `sizeTotals`, `compareBuilds`, `duplicatePackages` and `evaluateBudgets`; `output/` writes a report as text or markdown, or the report itself as JSON. Files are read only through `CliEnvironment`, so the tests run whole commands in memory.
 
 ## Performance
 

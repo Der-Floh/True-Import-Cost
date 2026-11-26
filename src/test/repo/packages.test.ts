@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
-import { createRequire } from 'node:module';
+import { createRequire, isBuiltin } from 'node:module';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { describe, expect, it } from 'vitest';
@@ -94,4 +94,51 @@ describe.each(PACKAGES)('the $name package', ({ directory, name, peer }) => {
         expect(declaration).toContain(`from '${peer}'`);
         expect(declaration).not.toMatch(/from ['"]\.\.?\//);
     });
+});
+
+interface CliManifest {
+    readonly name: string;
+    readonly version: string;
+    readonly license: string;
+    readonly bin: Readonly<Record<string, string>>;
+    readonly engines: { readonly node: string };
+    readonly dependencies?: Readonly<Record<string, string>>;
+    readonly peerDependencies?: Readonly<Record<string, string>>;
+    readonly publishConfig?: { readonly access?: string };
+}
+
+describe('the @true-import-cost/cli package', () => {
+    const directory = path.join(ROOT, 'packages/cli');
+    const manifest = JSON.parse(readFileSync(path.join(directory, 'package.json'), 'utf8')) as CliManifest;
+
+    it('is public, MIT licensed, runs on Node 18 and later, and depends on nothing', () => {
+        expect(manifest.name).toBe('@true-import-cost/cli');
+        expect(manifest.version).toMatch(/^\d+\.\d+\.\d+$/);
+        expect(manifest.license).toBe('MIT');
+        expect(manifest.publishConfig?.access).toBe('public');
+        expect(manifest.engines.node).toBe('>=18');
+        expect(manifest.dependencies ?? {}).toEqual({});
+        expect(manifest.peerDependencies ?? {}).toEqual({});
+    });
+
+    it('carries the repository licence unchanged', () => {
+        expect(readFileSync(path.join(directory, 'LICENSE'), 'utf8')).toBe(readFileSync(path.join(ROOT, 'LICENSE'), 'utf8'));
+    });
+
+    it('installs one command: a single script that needs nothing but Node', () => {
+        const source = readFileSync(path.join(directory, manifest.bin['true-import-cost'] ?? 'missing'), 'utf8');
+        const required = [...source.matchAll(/\brequire\("([^"]+)"\)/g)].map(match => match[1] ?? '');
+
+        expect(Object.keys(manifest.bin)).toEqual(['true-import-cost']);
+        expect(source.startsWith('#!/usr/bin/env node\n')).toBe(true);
+        expect(required.length).toBeGreaterThan(0);
+        expect(required.filter(name => !isBuiltin(name))).toEqual([]);
+    });
+
+    it('packs only its command, its readme and its licence', () => {
+        const output = execFileSync('npm', ['pack', '--dry-run', '--json', '--ignore-scripts'], { cwd: directory, encoding: 'utf8' });
+        const [packed] = JSON.parse(output) as { files: PackedFile[] }[];
+
+        expect((packed?.files ?? []).map(file => file.path).sort()).toEqual(['LICENSE', 'README.md', 'dist/cli.cjs', 'package.json']);
+    }, 60_000);
 });

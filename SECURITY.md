@@ -33,6 +33,10 @@ The plugins run inside your build. They have no runtime dependencies, make no ne
 
 In measurement mode, which only the `TRUE_IMPORT_COST_MEASURE` environment variable turns on, a plugin reads the request file the variable names. It refuses a request it cannot validate. It applies the edits the request lists to the source in memory, but only where the text still matches what the request expects. It keeps the build from writing its output, stopping the build rather than writing if another plugin turns writing back on. It writes its snapshot and an edit report to the folder the request names, instead of `.true-import-cost`.
 
+## The CLI
+
+`@true-import-cost/cli` has no runtime dependencies, makes no network requests, runs nothing and writes no files: its report goes to standard output. It reads the files named on its command line and the `package.json` of bundled packages for their versions. Metadata goes through the same size limit (`--max-size`, 64 MB by default), validation and consistency checks as in the extension. Text taken from metadata is printed with control and invisible formatting characters escaped, so it cannot start a line of its own in a CI log, where it could pass for a workflow command.
+
 ## Supply chain
 
 - The source is MIT licensed and public; releases are built by public GitHub Actions workflows from tagged commits.

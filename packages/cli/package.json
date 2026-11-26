@@ -1,0 +1,40 @@
+{
+    "name": "@true-import-cost/cli",
+    "version": "0.1.0",
+    "description": "Command-line tool that summarises, compares and checks the size of your production build in CI, from the metadata your bundler writes",
+    "license": "MIT",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/Der-Floh/True-Import-Cost.git",
+        "directory": "packages/cli"
+    },
+    "homepage": "https://github.com/Der-Floh/True-Import-Cost/tree/main/packages/cli#readme",
+    "bugs": {
+        "url": "https://github.com/Der-Floh/True-Import-Cost/issues"
+    },
+    "keywords": [
+        "bundle size",
+        "size budget",
+        "size limit",
+        "import cost",
+        "esbuild",
+        "vite",
+        "rollup",
+        "ci",
+        "true-import-cost"
+    ],
+    "bin": {
+        "true-import-cost": "dist/cli.cjs"
+    },
+    "files": [
+        "dist",
+        "README.md",
+        "LICENSE"
+    ],
+    "engines": {
+        "node": ">=18"
+    },
+    "publishConfig": {
+        "access": "public"
+    }
+}

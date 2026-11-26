@@ -26,6 +26,7 @@ See what each import really costs **in your production build** — read from the
 - **Show importers** — from a package or module to every line in your code that imports it
 - **Measured marginal cost** — build the target once with and once without an import, or compare two builds of your own, and the hover shows exactly what the build saves without it
 - **Standalone size** — the imported names and the whole package bundled by themselves with your project's bundler, minified and gzipped
+- **CLI for CI** — [`@true-import-cost/cli`](packages/cli/README.md) prints a build's sizes and its largest and duplicate packages, compares two builds as a pull request comment, and fails the pipeline when a size budget is exceeded
 - **Local, and runs nothing unless you ask** — no network access, no telemetry. Hints, hovers and the dashboard only read build metadata, which is validated and size-limited, and nothing is written to the workspace. Measuring an import runs your build only when you ask, in a trusted workspace, after you allow the command
 
 ---
@@ -158,6 +159,10 @@ Measured · Built without this import, the build is 70 kB smaller, all of it in 
 
 Budgets are keyed by build target, or `*` for every target; a target's own budget wins field by field. Sizes are bytes or text such as `30 kB`, `1.5 MB` or `500 KiB`. An import whose bundled size is over `import`, or a package over its limit in `packages`, gets a warning on the import; `total`, `initial`, `javascript` and `css` are checked in the status bar and the dashboard.
 
+### In CI
+
+[`@true-import-cost/cli`](packages/cli/README.md) reads the same metadata outside VS Code: `true-import-cost check .true-import-cost/webview.json --budgets .vscode/settings.json` checks the budgets above and exits with 1 when one is exceeded, and `true-import-cost compare` writes the change since another build as markdown for a pull request comment.
+
 ### Build targets
 
 Every metadata file is one build target, named after its `target` (snapshots), its `id` in `trueImportCost.targets`, or its file name. A file that several targets contain — shared code in an extension host and a webview — is measured against one of them at a time: **Select Build Target** picks it, or *Automatic* uses the first target that contains the file. The hover lists the cost in every other target.
@@ -249,6 +254,12 @@ npm install --save-dev @true-import-cost/vite
 npm install --save-dev @true-import-cost/esbuild
 ```
 
+So is the CLI for CI pipelines:
+
+```bash
+npm install --save-dev @true-import-cost/cli
+```
+
 ---
 
 ## 🧩 Repository
@@ -265,11 +276,12 @@ Bug reports and feature requests are welcome via [Issues](https://github.com/Der
 
 | Layer | Where | Purpose |
 | --- | --- | --- |
-| Core | `src/core` | The snapshot schema and its validation, the esbuild and Rollup/Rolldown adapters, the module graph (reachability, exclusive and shared bytes, why-included chains, duplicates) and import attribution. No `vscode`, no Node built-ins: the bundler plugins and a future CLI reuse it |
+| Core | `src/core` | The snapshot schema and its validation, the esbuild and Rollup/Rolldown adapters, the module graph (reachability, exclusive and shared bytes, why-included chains, duplicates) and import attribution. No `vscode`, no Node built-ins: the bundler plugins and the CLI reuse it |
 | Parser | `src/parser` | Import extraction and symbol-based usage analysis with the TypeScript compiler API, and Vue single-file components through `@vue/compiler-dom`. Bundled separately and loaded on first use, so activation does not pay for TypeScript |
 | Extension | `src/extension` | Finding, reading and watching metadata, build targets, inlay hints, hovers, diagnostics, views, commands, baselines and history |
 | Dashboard | `src/webview`, `src/shared` | Vue 3 webview built with Vite into one script, talking to the host only through the message contract in `src/shared` |
 | Bundler plugins | `src/plugins`, published from `packages/` | `@true-import-cost/esbuild` and `@true-import-cost/vite`, built from the same core sources |
+| CLI | `src/cli`, published from `packages/cli` | `true-import-cost summary`, `compare` and `check` for CI pipelines, on the same core |
 
 [docs/architecture.md](docs/architecture.md) explains the data flow, [docs/snapshot-schema.md](docs/snapshot-schema.md) the metadata format and [docs/roadmap.md](docs/roadmap.md) what comes next.
 
@@ -281,23 +293,23 @@ npm, and nothing else — packaging needs it regardless, since `vsce` shells out
 npm ci                   # install exactly what package-lock.json pins
 npm run compile          # check-types + lint + both host bundles + the dashboard + the plugin packages
 npm run watch            # esbuild and tsc watchers, which is what F5 starts
-npm test                 # build, then vitest: core, builds, host, webview and repo
+npm test                 # build, then vitest: core, builds, host, webview, repo and cli
 npm run test:integration # build, then the extension in a real VS Code through @vscode/test-electron
 npm run fixtures         # build both fixture projects, so their launch configurations open with metadata
 npm run package          # vsce package
 ```
 
-`out/extension.js` is the extension host; `out/parser.js` holds TypeScript and the Vue compiler and is required the first time a document is analysed. `npm run bundle:packages` builds `packages/*/dist` with CommonJS, ES module and declaration files.
+`out/extension.js` is the extension host; `out/parser.js` holds TypeScript and the Vue compiler and is required the first time a document is analysed. `npm run bundle:packages` builds `packages/*/dist`: CommonJS, ES module and declaration files for the plugins, and the CLI's single `dist/cli.cjs`.
 
 ### Tests
 
-Five Vitest projects: `core` (pure engine and parser, deliberately *without* a `vscode` alias), `builds` (real esbuild and Vite builds of the fixture projects in `src/test/fixtures/projects`, compared byte for byte with what the bundler reports, plus both plugins), `host` (a hand-written `vscode` mock), `webview` (the dashboard in jsdom) and `repo` (the manifest, the documentation, the dashboard's page template, the exact contents of the VSIX and of both npm packages). The fixture projects carry hand-written packages for shared internals, tree shaking, side effects, two versions of one package, cycles and CommonJS. The integration tests open a built fixture in VS Code and check hints, hovers, diagnostics and commands.
+Six Vitest projects: `core` (pure engine and parser, deliberately *without* a `vscode` alias), `builds` (real esbuild and Vite builds of the fixture projects in `src/test/fixtures/projects`, compared byte for byte with what the bundler reports, plus the plugins and measured builds), `host` (a hand-written `vscode` mock), `webview` (the dashboard in jsdom), `repo` (the manifest, the documentation, the dashboard's page template, the exact contents of the VSIX and of the npm packages) and `cli` (argument parsing and every output format with in-memory files, plus the built command run by Node against a real esbuild build). The fixture projects carry hand-written packages for shared internals, tree shaking, side effects, two versions of one package, cycles and CommonJS. The integration tests open a built fixture in VS Code and check hints, hovers, diagnostics and commands.
 
 ### CI & Releases
 
 CI runs on every push and pull request through the shared workflows of [Florian-Noever/Florian-Noever](https://github.com/Florian-Noever/Florian-Noever/blob/main/.github/CI.md): one job runs `npm run ci:check`, one the integration tests, and one packs a preview VSIX.
 
-To release the extension, bump the version with `npm version x.y.z --no-git-tag-version` and publish a GitHub release `vx.y.z` from a commit whose CI is green. The plugin packages are released with the **Publish npm packages** workflow, which builds, tests and publishes a package with provenance through npm trusted publishing.
+To release the extension, bump the version with `npm version x.y.z --no-git-tag-version` and publish a GitHub release `vx.y.z` from a commit whose CI is green. The npm packages are released with the **Publish npm packages** workflow, which builds, tests and publishes a package with provenance through npm trusted publishing.
 
 ---
 

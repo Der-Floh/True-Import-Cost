@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to True Import Cost are documented here. The extension and the two bundler plugins share this file; plugin entries name their package.
+All notable changes to True Import Cost are documented here. The extension, the bundler plugins and the CLI share this file; package entries name their package.
 
 ## 0.1.0
 
@@ -41,3 +41,12 @@ The first release. It covers milestones v0.1 to v0.5 of the [roadmap](docs/roadm
 - Per-module sizes from rendered lengths scaled to the minified chunk, or from the source maps when the build writes them
 - CSS split across the stylesheets and Vue style blocks that produced it; emitted assets attributed to the modules they came from
 - Measurement mode for True Import Cost's measured costs: with `TRUE_IMPORT_COST_MEASURE` set, takes one import out of a file in memory, writes no output, and puts its snapshot in a temporary folder
+
+### `@true-import-cost/cli` 0.1.0
+
+- `true-import-cost summary`, `compare` and `check` for CI pipelines, reading the same metadata as the extension: True Import Cost snapshots, esbuild metafiles and any other supported build metadata
+- `summary`: total, JavaScript, CSS, other assets, initial and lazily loaded sizes, the largest packages with their versions, and duplicate packages
+- `compare`: the change in every size, the packages added, removed or changed in size or version, the chunks, and the modules that changed most; the markdown format is made for pull request comments
+- `check`: evaluates the target's `trueImportCost.budgets`, read from a JSON file or straight from `.vscode/settings.json`, and exits with 1 when a budget is exceeded
+- Text, markdown and documented JSON output, deterministic and ASCII; text from the metadata is escaped so it cannot forge lines in a CI log
+- Exit code 2 with a one-line message for usage errors and unreadable files; metadata larger than `--max-size` (64 MB) is rejected unread

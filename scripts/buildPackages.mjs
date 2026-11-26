@@ -1,4 +1,4 @@
-import { mkdir, rm, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -81,5 +81,28 @@ async function buildPackage({ directory, entry, peers }, compilerOptions) {
     ]);
 }
 
+const CLI = { directory: 'packages/cli', entry: 'src/cli/main.ts', bin: 'dist/cli.cjs' };
+
+async function buildCli({ directory, entry, bin }) {
+    const dist = path.join(ROOT, directory, 'dist');
+    await rm(dist, { recursive: true, force: true });
+    await mkdir(dist, { recursive: true });
+    const { version } = JSON.parse(await readFile(path.join(ROOT, directory, 'package.json'), 'utf8'));
+    const outfile = path.join(ROOT, directory, bin);
+    await esbuild.build({
+        entryPoints: [path.join(ROOT, entry)],
+        bundle: true,
+        platform: 'node',
+        target: 'node18',
+        format: 'cjs',
+        outfile,
+        banner: { js: '#!/usr/bin/env node' },
+        define: { CLI_VERSION: JSON.stringify(version) },
+        logLevel: 'warning',
+        legalComments: 'none',
+    });
+    await chmod(outfile, 0o755);
+}
+
 const compilerOptions = readCompilerOptions();
-await Promise.all(PACKAGES.map(item => buildPackage(item, compilerOptions)));
+await Promise.all([...PACKAGES.map(item => buildPackage(item, compilerOptions)), buildCli(CLI)]);
