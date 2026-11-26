@@ -120,7 +120,7 @@ Attribution is per module: bundlers report what each **module** contributes, not
 **Show Bundle Dashboard** — or the graph icon on the *Bundle Contents* view — opens the whole build of a target at a glance:
 
 - **Sizes** — total, JavaScript, CSS, other assets, the initial load (entry chunks, what they import statically and their CSS) and what loads lazily, each with its change since the baseline
-- **Treemap** — project sources by folder, each package instance and the bundler's own code, sized by what the build kept. Click a tile to look inside it, or to open the module; lazily loaded code is marked
+- **Treemap** — project sources by folder, each package instance, the modules the bundler generates, and the output no module accounts for (runtime helpers and module wrappers), sized by what the build kept. Click a tile to look inside it, or to open the module; lazily loaded code is marked
 - **Packages** — every bundled package with its versions, its lazily loaded part, its change and its budget, sortable and searchable, with *Explain why included* and *Show importers* on each
 - **Chunks and assets**, **duplicates**, **budgets**, the **modules that changed most** since the baseline, the **size history** of the target and, with several targets, a **comparison** of each package across them
 

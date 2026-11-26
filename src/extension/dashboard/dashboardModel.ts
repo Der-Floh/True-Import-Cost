@@ -197,6 +197,24 @@ function generatedNode(graph: BuildGraph, modules: readonly ModuleRecord[], lazy
     };
 }
 
+function unattributedNode(snapshot: BuildSnapshot): TreemapNodeDto | undefined {
+    const attributed = new Map<string, number>();
+    for (const module of snapshot.modules) {
+        for (const contribution of module.contributions) {
+            attributed.set(contribution.chunkId, (attributed.get(contribution.chunkId) ?? 0) + contribution.bytes);
+        }
+    }
+    const loading = chunkLoading(snapshot);
+    let bytes = 0;
+    let lazyBytes = 0;
+    for (const chunk of snapshot.chunks) {
+        const rest = Math.max(0, chunk.bytes - (attributed.get(chunk.id) ?? 0));
+        bytes += rest;
+        lazyBytes += loading.get(chunk.id) === 'lazy' ? rest : 0;
+    }
+    return bytes === 0 ? undefined : { id: 'group:unattributed', label: 'Not attributed to a module', bytes, kind: 'other', lazy: lazyBytes >= bytes };
+}
+
 export function treemapOf(graph: BuildGraph, label: string): TreemapNodeDto {
     const lazy = lazyBytesByModule(graph.snapshot);
     const duplicated = new Set(duplicatePackages(graph).map(duplicate => duplicate.name));
@@ -210,7 +228,7 @@ export function treemapOf(graph: BuildGraph, label: string): TreemapNodeDto {
     const packages = [...graph.packages().values()]
         .filter(instance => instance.bytes > 0)
         .map(instance => packageNode(graph, instance, duplicated.has(instance.name), lazy));
-    const children = [projectNode(graph, project, lazy), ...packages, generatedNode(graph, generated, lazy)]
+    const children = [projectNode(graph, project, lazy), ...packages, generatedNode(graph, generated, lazy), unattributedNode(graph.snapshot)]
         .filter((node): node is TreemapNodeDto => node !== undefined);
     return {
         id: 'root',

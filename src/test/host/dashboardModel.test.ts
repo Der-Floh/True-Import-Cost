@@ -103,6 +103,28 @@ describe('the treemap of a build', () => {
         expect(nested.children?.[0]?.children?.map(node => node.label)).toEqual(['main.ts', 'util.ts']);
     });
 
+    it('adds the output no module accounts for, such as the runtime the bundler wraps modules in', () => {
+        const graph = fixture()
+            .module('src/main.ts', 700, { entry: true, chunk: 'dist/main.js' })
+            .module('src/lazy.ts', 250, { chunk: 'dist/lazy.js' })
+            .chunk({ id: 'dist/main.js', bytes: 1_000, entry: true, entryModule: 'src/main.ts', dynamicImports: ['dist/lazy.js'] })
+            .chunk({ id: 'dist/lazy.js', bytes: 300, dynamicEntry: true })
+            .graph();
+        const lazyOnly = fixture()
+            .module('src/main.ts', 100, { entry: true, chunk: 'dist/main.js' })
+            .module('src/lazy.ts', 250, { chunk: 'dist/lazy.js' })
+            .chunk({ id: 'dist/main.js', bytes: 100, entry: true, entryModule: 'src/main.ts', dynamicImports: ['dist/lazy.js'] })
+            .chunk({ id: 'dist/lazy.js', bytes: 300, dynamicEntry: true })
+            .graph();
+
+        const map = treemapOf(graph, 'x');
+
+        expect(find(map, 'group:unattributed')).toEqual({ id: 'group:unattributed', label: 'Not attributed to a module', bytes: 350, kind: 'other', lazy: false });
+        expect(map.bytes).toBe(1_300);
+        expect(find(treemapOf(lazyOnly, 'x'), 'group:unattributed')).toMatchObject({ bytes: 50, lazy: true });
+        expect(find(treemap, 'group:unattributed')).toBeUndefined();
+    });
+
     it('folds a long tail of small children into one tile', () => {
         const many = fixture();
         for (let index = 0; index < 200; index++) {
