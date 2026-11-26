@@ -5,15 +5,17 @@ import { readFolderSettings } from '../services/settings';
 
 import type { BaselineStore } from '../services/baselineStore';
 import type { LoadedTarget } from '../services/metadataLoader';
+import type { MetadataReader } from '../services/metadataReader';
 import type { CurrentTarget } from '../views/currentTarget';
 
 export interface CompareDependencies {
     readonly current: CurrentTarget;
     readonly baselines: BaselineStore;
+    readonly reader: MetadataReader;
     readonly showDashboard: (targetKey: string) => Promise<void>;
 }
 
-export async function compareWithFile(baselines: BaselineStore, target: LoadedTarget): Promise<void> {
+export async function compareWithFile(baselines: BaselineStore, target: LoadedTarget, reader: MetadataReader): Promise<void> {
     const [uri] = await vscode.window.showOpenDialog({
         canSelectMany: false,
         canSelectFolders: false,
@@ -25,7 +27,7 @@ export async function compareWithFile(baselines: BaselineStore, target: LoadedTa
     if (!uri) {
         return;
     }
-    const result = await loadTarget({ uri, folder: target.source.folder, maxBytes: readFolderSettings(target.source.folder).maxMetadataBytes });
+    const result = await loadTarget({ uri, folder: target.source.folder, maxBytes: readFolderSettings(target.source.folder).maxMetadataBytes }, reader);
     if (!result.ok) {
         void vscode.window.showErrorMessage(`True Import Cost cannot compare with ${vscode.workspace.asRelativePath(uri)}: ${result.error}.`);
         return;
@@ -55,7 +57,7 @@ export async function compareBuilds(dependencies: CompareDependencies): Promise<
     if (picked.action === 'pin') {
         await dependencies.baselines.pin(target);
     } else if (picked.action === 'file') {
-        await compareWithFile(dependencies.baselines, target);
+        await compareWithFile(dependencies.baselines, target, dependencies.reader);
     } else {
         await dependencies.baselines.clear(target.key);
     }

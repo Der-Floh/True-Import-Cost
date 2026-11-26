@@ -257,7 +257,7 @@ Install **True Import Cost** from the [Visual Studio Marketplace](https://market
 code --install-extension Florian-Noever.true-import-cost
 ```
 
-Every [GitHub release](https://github.com/Der-Floh/True-Import-Cost/releases) also carries its VSIX, for *Extensions → … → Install from VSIX…*. `npm run package` builds one from source.
+Every [GitHub release](https://github.com/Der-Floh/True-Import-Cost/releases) also carries its VSIX, for *Extensions → … → Install from VSIX…*, with its SHA-256 checksum and a build provenance attestation: [SECURITY.md](SECURITY.md#verifying-a-release) shows how to check both. `npm run package` builds one from source.
 
 The bundler plugins are separate npm packages:
 

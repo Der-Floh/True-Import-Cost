@@ -27,7 +27,7 @@ Rspack build ───► @true-import-cost/webpack ──► snapshot ─┤
 | Extension | `src/extension` | core; the parser's types, and its code only through `services/parserHost.ts` | the extension host |
 | Bundler plugins | `src/plugins` | core and Node built-ins | the user's build |
 | CLI | `src/cli` | core and Node built-ins | CI pipelines, as `@true-import-cost/cli` |
-| Drivers | `src/driver` | core and Node built-ins | a Node process of its own, which the extension starts with VS Code's runtime to bundle a package by itself |
+| Drivers | `src/driver` | core and Node built-ins | outside the extension host's thread: a Node process of its own, which the extension starts with VS Code's runtime to bundle a package by itself, and the worker thread that reads large build metadata |
 | Shared contract | `src/shared` | core types only | the extension host and the dashboard |
 | Dashboard | `src/webview` | `src/shared` and pure core modules | the dashboard webview |
 
@@ -37,7 +37,7 @@ ESLint enforces the boundaries (`eslint.config.mjs`), and the `core` Vitest proj
 
 - **Schema** (`schema/snapshot.ts`, `schema/validate.ts`) — the `BuildSnapshot` format described in [snapshot-schema.md](snapshot-schema.md), validated with `zod/mini` plus consistency checks between modules, imports and outputs.
 - **Adapters** (`adapters/`) — the `BundlerAdapter` interface (`supports`, `normalize`), the esbuild metafile adapter, the Rollup/Rolldown adapter the Vite plugin uses, the webpack and Rspack stats adapter, which the webpack plugin uses too, and a pass-through for snapshots. `normalizeMetadata` picks the adapter that recognises the input and validates whatever it produces. A new bundler is a new adapter; nothing else changes.
-- **Graph** (`graph/`) — `BuildGraph` indexes modules by id and by path, imports in both directions, package instances by install root (two installed versions are two instances), retained bytes and the precision of each module. On top of it: reachability, the impact of one import edge (bundled, lazy, exclusive and shared bytes), why-included chains and duplicate packages. Every traversal keeps a visited set, so cycles terminate.
+- **Graph** (`graph/`) — `BuildGraph` indexes modules by id and by path, imports in both directions, package instances by install root (two installed versions are two instances), retained bytes and the precision of each module. On top of it: reachability, the impact of one import edge (bundled, lazy, exclusive and shared bytes), why-included chains and duplicate packages. Every traversal keeps a visited set, so cycles terminate. Import costs walk a compact index of the graph (`graph/graphIndex.ts`), and exclusive bytes come from a dominator tree that is built once per build (`graph/exclusion.ts`): removing the imports of one document stops exactly the modules that every path from the entry points reaches through those imports.
 - **Attribution** (`attribution/`) — matches an import of the document to an import edge of the build, traces a named import of a barrel to the modules that define what it uses (`barrels.ts`), and turns the result into an `ImportCost`.
 
 ## Matching an import to the build
@@ -96,9 +96,14 @@ TypeScript and the Vue compiler are several megabytes, so the parser is its own 
 
 | Operation | Approach |
 | --- | --- |
-| Activation | Registers providers and starts finding metadata; `out/extension.js` is about 160 kB minified, and a test keeps the parser out of it |
+| Activation | Registers providers and starts finding metadata; `out/extension.js` is about 170 kB minified, and a test keeps the parser out of it |
+| Reading metadata | A file of 512 kB or more is decoded, normalised and validated in a worker thread (`out/metadataWorker.js`), which also builds the graph's indexes and hands them over without copying; the extension host parses the finished snapshot and builds its `BuildGraph`. Smaller files are read on the host, and so is every file once the worker fails to start or stops unexpectedly |
 | First analysis | Loads `out/parser.js` once |
 | Analysis | One parse per document version, after the document has been unchanged for `analysis.debounceMs` |
-| Costs | Graph traversals cached per graph and import edge |
+| Costs | One walk of what an import reaches, cached per graph and import edge; exclusive bytes from the dominator tree, instead of a walk of the whole build per import |
 | Barrels | Only for named imports of modules whose imports branch; each file on the way parsed once until the metadata reloads |
 | Builds | None, unless you measure an import or a standalone size: then the build command, or the project's bundler, runs once or twice in a process of its own |
+
+For a synthetic build of 60,000 modules and 240,000 imports, a 30 MB esbuild metafile, the worker takes about 3 seconds while the extension host stays free. The host then spends about half a second parsing the snapshot and building the graph. The 54 imports of the entry point cost about 0.7 seconds together, and each later document tens of milliseconds.
+
+`src/test/core/performance.test.ts` holds a build of 30,000 modules to budgets that leave room for slow CI machines: reading the metadata, building the graph, costing the first and the next document, indexing the graph in the background, adopting those indexes, and comparing two builds. A change that brings back a walk of the whole build per import fails them.

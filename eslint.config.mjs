@@ -10,6 +10,7 @@ const NODE_BUILTINS = [
     'crypto', 'node:crypto', 'buffer', 'node:buffer',
     'stream', 'node:stream', 'util', 'node:util',
     'url', 'node:url', 'zlib', 'node:zlib',
+    'worker_threads', 'node:worker_threads',
 ];
 
 const noNodeBuiltins = message => NODE_BUILTINS.map(name => ({ name, message }));
@@ -196,10 +197,23 @@ export default tseslint.config(
         },
     },
     {
+        // Reading build metadata of a large project takes seconds, so it runs in a worker thread instead of blocking the extension host.
+        files: ['src/extension/services/metadataReader.ts'],
+        rules: {
+            'no-restricted-imports': ['error', {
+                paths: noNodeBuiltins('Use vscode.workspace.fs and vscode.Uri: they work for remote workspaces too.')
+                    .filter(entry => !entry.name.endsWith('worker_threads')),
+                patterns: [
+                    { group: ['**/plugins/**'], message: 'The bundler plugins are not part of the extension.' },
+                ],
+            }],
+        },
+    },
+    {
         files: ['src/driver/**/*.ts'],
         rules: {
             'no-restricted-imports': ['error', {
-                paths: [noVscode('The drivers run in a Node process of their own, outside VS Code.')],
+                paths: [noVscode('The drivers run outside VS Code, in a Node process or worker thread of their own.')],
                 patterns: [
                     { group: ['**/extension/**', '**/parser', '**/parser/**', '**/plugins/**', '**/webview/**'], message: 'The drivers may depend on src/core only.' },
                 ],

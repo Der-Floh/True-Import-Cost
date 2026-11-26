@@ -73,14 +73,19 @@ function guarded(name: string, run: (...args: unknown[]) => unknown): (...args: 
 export function registerCommands(dependencies: CommandDependencies): vscode.Disposable[] {
     const handlers: Record<string, (...args: unknown[]) => unknown> = {
         [Command.selectTarget]: () => selectTarget(dependencies.store, dependencies.selection),
-        [Command.importMetadata]: () => importMetadata(),
+        [Command.importMetadata]: () => importMetadata(dependencies.store.reader),
         [Command.refresh]: () => dependencies.refresh(),
         [Command.explainWhyIncluded]: (argument?: unknown) => explainWhyIncluded(dependencies, argument),
         [Command.toggleInlayHints]: () => setInlayHintsEnabled(!dependencies.settings().inlayHints),
         [Command.clearCache]: () => dependencies.clearCache(),
         [Command.showLog]: () => Logger.show(),
         [Command.showDashboard]: () => dependencies.showDashboard(),
-        [Command.compareBuilds]: () => compareBuilds({ current: dependencies.current, baselines: dependencies.baselines, showDashboard: key => dependencies.showDashboard(key) }),
+        [Command.compareBuilds]: () => compareBuilds({
+            current: dependencies.current,
+            baselines: dependencies.baselines,
+            reader: dependencies.store.reader,
+            showDashboard: key => dependencies.showDashboard(key),
+        }),
         [Command.showImporters]: (argument?: unknown) => showImporters(dependencies, argument),
         [Command.clearHistory]: () => clearHistory(dependencies.history),
         [Command.measureImport]: (argument?: unknown) => dependencies.measurer.measure(argument),

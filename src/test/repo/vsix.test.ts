@@ -10,6 +10,7 @@ const SHIPS = [
     'assets/icon-x512.png',
     'media/dashboard.html',
     'out/extension.js',
+    'out/metadataWorker.js',
     'out/parser.js',
     'out/standalone.js',
     'package.json',
@@ -17,7 +18,7 @@ const SHIPS = [
     'public/dashboard.js',
 ];
 
-const BUILT = ['out/extension.js', 'out/parser.js', 'out/standalone.js', 'public/dashboard.js', 'public/dashboard.css'];
+const BUILT = ['out/extension.js', 'out/parser.js', 'out/standalone.js', 'out/metadataWorker.js', 'public/dashboard.js', 'public/dashboard.css'];
 
 let files: readonly string[] = [];
 

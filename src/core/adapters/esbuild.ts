@@ -140,6 +140,22 @@ function moduleId(path: string): string {
     return isVirtualPath(path) ? path : normalizePath(path);
 }
 
+function modulePath(path: string): string {
+    return isVirtualPath(path) ? path : normalizePath(splitQuery(path).path);
+}
+
+function memoized(transform: (path: string) => string): (path: string) => string {
+    const known = new Map<string, string>();
+    return (path) => {
+        let result = known.get(path);
+        if (result === undefined) {
+            result = transform(path);
+            known.set(path, result);
+        }
+        return result;
+    };
+}
+
 function linkedOutputs(output: OutputRecord, outputs: ReadonlyMap<string, OutputRecord>, wanted: (record: ImportRecord) => boolean): string[] {
     return output.imports.filter(record => !record.external && outputs.has(record.path) && wanted(record)).map(record => record.path);
 }
@@ -151,11 +167,11 @@ export function isEsbuildMetafile(value: unknown): value is EsbuildMetafile {
 export function normalizeEsbuildMetafile(metafile: unknown, context: BuildContext): BuildSnapshot {
     const { inputs, outputs } = readMetafile(metafile);
     const builder = new SnapshotBuilder();
+    const idOf = memoized(moduleId);
+    const pathOf = memoized(modulePath);
 
     for (const [path, input] of inputs) {
-        const id = moduleId(path);
-        const virtual = isVirtualPath(path);
-        builder.module(id, virtual ? path : normalizePath(splitQuery(path).path), { virtual, sourceBytes: input.bytes });
+        builder.module(idOf(path), pathOf(path), { virtual: isVirtualPath(path), sourceBytes: input.bytes });
     }
 
     const retainedExternals = new Set<string>();
@@ -168,7 +184,7 @@ export function normalizeEsbuildMetafile(metafile: unknown, context: BuildContex
     }
 
     for (const [path, input] of inputs) {
-        const importer = moduleId(path);
+        const importer = idOf(path);
         for (const record of input.imports) {
             const kind = importKindOf(record.kind);
             if (kind === undefined) {
@@ -184,9 +200,9 @@ export function normalizeEsbuildMetafile(metafile: unknown, context: BuildContex
                 });
                 continue;
             }
-            const resolved = moduleId(record.path);
+            const resolved = idOf(record.path);
             if (!builder.hasModule(resolved)) {
-                builder.module(resolved, isVirtualPath(record.path) ? record.path : normalizePath(splitQuery(record.path).path), { virtual: isVirtualPath(record.path) });
+                builder.module(resolved, pathOf(record.path), { virtual: isVirtualPath(record.path) });
             }
             builder.edge({
                 importer,
@@ -200,16 +216,16 @@ export function normalizeEsbuildMetafile(metafile: unknown, context: BuildContex
 
     for (const [path, output] of outputs) {
         if (output.entryPoint !== undefined) {
-            builder.markEntryCandidate(moduleId(output.entryPoint));
+            builder.markEntryCandidate(idOf(output.entryPoint));
         }
         const chunkKind = chunkKindOf(path);
         if (chunkKind === undefined) {
             builder.asset({ id: path, kind: assetKindOf(path), bytes: output.bytes });
         }
         for (const [inputPath, bytes] of output.inputs) {
-            const id = moduleId(inputPath);
+            const id = idOf(inputPath);
             if (!builder.hasModule(id)) {
-                builder.module(id, isVirtualPath(inputPath) ? inputPath : normalizePath(splitQuery(inputPath).path), { virtual: isVirtualPath(inputPath) });
+                builder.module(id, pathOf(inputPath), { virtual: isVirtualPath(inputPath) });
             }
             builder.contribute(id, path, bytes, 'bundler-reported');
         }
@@ -222,7 +238,7 @@ export function normalizeEsbuildMetafile(metafile: unknown, context: BuildContex
         if (chunkKind === undefined) {
             continue;
         }
-        const entryModule = output.entryPoint === undefined ? undefined : moduleId(output.entryPoint);
+        const entryModule = output.entryPoint === undefined ? undefined : idOf(output.entryPoint);
         const isEntry = entryModule !== undefined && builder.isEntry(entryModule);
         builder.chunk({
             id: path,

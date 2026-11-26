@@ -23,6 +23,7 @@ jobs:
         out/extension.js
         out/parser.js
         out/standalone.js
+        out/metadataWorker.js
         public/dashboard.js
         public/dashboard.css
         media/dashboard.html
@@ -32,3 +33,23 @@ jobs:
       open-vsx: true
     secrets:
       OPEN_VSX_TOKEN: ${{ secrets.OPEN_VSX_TOKEN }}
+
+  checksums:
+    name: Attach checksums
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ github.event.release.tag_name }}
+    steps:
+      - name: Download the VSIX from the release
+        run: gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern '*.vsix' --dir release
+
+      - name: Write SHA256SUMS
+        working-directory: release
+        run: sha256sum -- *.vsix | tee SHA256SUMS
+
+      - name: Attach SHA256SUMS to the release
+        run: gh release upload "$TAG" release/SHA256SUMS --repo "$GITHUB_REPOSITORY" --clobber

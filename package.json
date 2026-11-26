@@ -68,6 +68,7 @@
         "out/extension.js",
         "out/parser.js",
         "out/standalone.js",
+        "out/metadataWorker.js",
         "public/dashboard.js",
         "public/dashboard.css"
     ],

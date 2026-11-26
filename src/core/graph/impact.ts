@@ -1,7 +1,10 @@
-import { followsEagerly, followsInclusion, reachableFrom } from './reachability';
+import { exclusionIndex } from './exclusion';
+import { graphIndex, reachIndices } from './graphIndex';
+import { followsInclusion, reachableFrom } from './reachability';
 import { PRECISION_RANK } from '../schema/snapshot';
 
 import type { BuildGraph } from './buildGraph';
+import type { GraphIndex, ShareKey } from './graphIndex';
 import type { MeasurementPrecision } from '../schema/snapshot';
 
 export interface PackageShare {
@@ -52,80 +55,112 @@ function cached(graph: BuildGraph, key: string, compute: () => ImportImpact): Im
     return impact;
 }
 
+type KeptTest = (node: number) => boolean;
+
 function restOfBuild(graph: BuildGraph, importerIds: readonly string[], moduleId: string): Set<string> {
     const importers = new Set(importerIds);
     return reachableFrom(graph, graph.entries, edge =>
         followsInclusion(edge) && !(edge.resolvedModule === moduleId && importers.has(edge.importer)));
 }
 
-function summarize(graph: BuildGraph, moduleId: string, eager: ReadonlySet<string>, all: ReadonlySet<string>, rest: ReadonlySet<string>): ImportImpact {
+function documentPathOf(graph: BuildGraph, importerIds: readonly string[]): string | undefined {
+    const paths = new Set(importerIds.map(id => graph.module(id)?.path));
+    const [path] = paths;
+    if (paths.size !== 1 || path === undefined) {
+        return undefined;
+    }
+    const importers = new Set(importerIds);
+    const atPath = graph.modulesAt(path);
+    return atPath.length === importers.size && atPath.every(module => importers.has(module.id)) ? path : undefined;
+}
+
+function keptByRestOfBuild(graph: BuildGraph, importerIds: readonly string[], moduleId: string): KeptTest {
+    const index = graphIndex(graph);
+    const target = index.indexOf.get(moduleId);
+    const path = documentPathOf(graph, importerIds);
+    if (path !== undefined && target !== undefined) {
+        const exclusion = exclusionIndex(graph);
+        const split = exclusion.splitOf(path, target);
+        return node => exclusion.keptWithout(split, node);
+    }
+    const rest = restOfBuild(graph, importerIds, moduleId);
+    return node => rest.has(index.ids[node] as string);
+}
+
+function nodesOf(index: GraphIndex, ids: readonly string[]): number[] {
+    return ids.flatMap((id) => {
+        const node = index.indexOf.get(id);
+        return node === undefined ? [] : [node];
+    });
+}
+
+function union(...groups: readonly (readonly number[])[]): number[] {
+    return [...new Set(groups.flat())];
+}
+
+const PRECISION_BY_RANK = new Map((Object.entries(PRECISION_RANK) as [MeasurementPrecision, number][]).map(([precision, rank]) => [rank, precision]));
+
+function summarize(index: GraphIndex, moduleId: string, eager: readonly number[], all: readonly number[], kept: KeptTest): ImportImpact {
     let bundledBytes = 0;
     let exclusiveBytes = 0;
     let retainedModuleCount = 0;
     let exclusiveModuleCount = 0;
-    let precision: MeasurementPrecision | undefined;
-    const shares = new Map<string, { key: string | undefined; name: string | undefined; version?: string; bytes: number }>();
+    let rank = -1;
+    const shareBytes = new Float64Array(index.shares.length);
+    const touched: number[] = [];
+    const eagerNodes = new Uint8Array(index.ids.length);
 
-    for (const id of eager) {
-        const bytes = graph.bytesOf(id);
+    for (const node of eager) {
+        eagerNodes[node] = 1;
+        const bytes = index.bytes[node] as number;
         if (bytes <= 0) {
             continue;
         }
         bundledBytes += bytes;
         retainedModuleCount++;
-        if (!rest.has(id)) {
+        if (!kept(node)) {
             exclusiveBytes += bytes;
             exclusiveModuleCount++;
         }
-        const modulePrecision = graph.precisionOf(id);
-        if (modulePrecision !== undefined && (precision === undefined || PRECISION_RANK[modulePrecision] > PRECISION_RANK[precision])) {
-            precision = modulePrecision;
+        rank = Math.max(rank, index.precision[node] as number);
+        const share = index.share[node] as number;
+        if (shareBytes[share] === 0) {
+            touched.push(share);
         }
-        const module = graph.module(id);
-        const shareKey = module?.packageRoot ?? '';
-        const share = shares.get(shareKey);
-        if (share) {
-            share.bytes += bytes;
-        } else {
-            shares.set(shareKey, {
-                key: module?.packageRoot,
-                name: module?.packageName,
-                ...(module?.packageVersion === undefined ? {} : { version: module.packageVersion }),
-                bytes,
-            });
-        }
+        shareBytes[share] = (shareBytes[share] as number) + bytes;
     }
 
     let lazyBytes = 0;
-    for (const id of all) {
-        if (!eager.has(id)) {
-            lazyBytes += graph.bytesOf(id);
+    for (const node of all) {
+        if (eagerNodes[node] === 0) {
+            lazyBytes += index.bytes[node] as number;
         }
     }
 
+    const precision = PRECISION_BY_RANK.get(rank);
     return {
         moduleId,
         bundledBytes,
         lazyBytes,
         exclusiveBytes,
         sharedBytes: bundledBytes - exclusiveBytes,
-        moduleCount: eager.size,
+        moduleCount: eager.length,
         retainedModuleCount,
         exclusiveModuleCount,
         ...(precision === undefined ? {} : { precision }),
-        packages: [...shares.values()].sort((a, b) => b.bytes - a.bytes),
+        packages: touched
+            .map(share => ({ ...index.shares[share] as ShareKey, bytes: shareBytes[share] as number }))
+            .sort((a, b) => b.bytes - a.bytes || (a.key ?? '').localeCompare(b.key ?? '')),
     };
 }
 
 export function importImpact(graph: BuildGraph, importerIds: readonly string[], moduleId: string): ImportImpact {
     const key = `${[...importerIds].sort().join('\u0001')}\u0002${moduleId}`;
-    return cached(graph, key, () => summarize(
-        graph,
-        moduleId,
-        reachableFrom(graph, [moduleId], followsEagerly),
-        reachableFrom(graph, [moduleId], followsInclusion),
-        restOfBuild(graph, importerIds, moduleId),
-    ));
+    return cached(graph, key, () => {
+        const index = graphIndex(graph);
+        const roots = nodesOf(index, [moduleId]);
+        return summarize(index, moduleId, reachIndices(index, roots, true), reachIndices(index, roots, false), keptByRestOfBuild(graph, importerIds, moduleId));
+    });
 }
 
 export function wholeModule(moduleId: string): ImportScope {
@@ -136,23 +171,25 @@ function scopeKey(scope: ImportScope): string {
     return [scope.moduleId, ...[scope.passThrough, scope.eagerRoots, scope.lazyRoots].map(ids => [...ids].sort().join('\u0001'))].join('\u0002');
 }
 
-function eagerModules(graph: BuildGraph, scope: ImportScope): Set<string> {
-    return new Set([...scope.passThrough, ...reachableFrom(graph, scope.eagerRoots, followsEagerly)]);
+function eagerNodesOf(index: GraphIndex, scope: ImportScope): number[] {
+    return union(nodesOf(index, scope.passThrough), reachIndices(index, nodesOf(index, scope.eagerRoots), true));
 }
 
-function includedModules(graph: BuildGraph, scope: ImportScope): Set<string> {
-    return new Set([...scope.passThrough, ...reachableFrom(graph, [...scope.eagerRoots, ...scope.lazyRoots], followsInclusion)]);
+function includedNodesOf(index: GraphIndex, scope: ImportScope): number[] {
+    return union(nodesOf(index, scope.passThrough), reachIndices(index, nodesOf(index, [...scope.eagerRoots, ...scope.lazyRoots]), false));
 }
 
 export function scopedImpact(graph: BuildGraph, importerIds: readonly string[], scope: ImportScope, alsoKept: readonly ImportScope[] = []): ImportImpact {
     const key = `scoped\u0003${[...importerIds].sort().join('\u0001')}\u0003${scopeKey(scope)}\u0003${alsoKept.map(scopeKey).sort().join('\u0004')}`;
     return cached(graph, key, () => {
-        const rest = restOfBuild(graph, importerIds, scope.moduleId);
-        for (const kept of alsoKept) {
-            for (const id of includedModules(graph, kept)) {
-                rest.add(id);
+        const index = graphIndex(graph);
+        const keptByRest = keptByRestOfBuild(graph, importerIds, scope.moduleId);
+        const keptByOthers = new Uint8Array(index.ids.length);
+        for (const other of alsoKept) {
+            for (const node of includedNodesOf(index, other)) {
+                keptByOthers[node] = 1;
             }
         }
-        return summarize(graph, scope.moduleId, eagerModules(graph, scope), includedModules(graph, scope), rest);
+        return summarize(index, scope.moduleId, eagerNodesOf(index, scope), includedNodesOf(index, scope), node => keptByOthers[node] === 1 || keptByRest(node));
     });
 }

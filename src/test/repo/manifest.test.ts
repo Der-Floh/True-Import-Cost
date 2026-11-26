@@ -70,6 +70,10 @@ describe('the manifest, as the registries read it', () => {
         expect(manifest.files).toContain(manifest.main.replace(/^\.\//, ''));
         expect(manifest.files).toContain('out/parser.js');
     });
+
+    it('ships the bundles the host starts on demand', () => {
+        expect(manifest.files).toEqual(expect.arrayContaining(['out/standalone.js', 'out/metadataWorker.js']));
+    });
 });
 
 describe('Restricted Mode', () => {

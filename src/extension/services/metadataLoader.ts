@@ -1,14 +1,14 @@
 import * as vscode from 'vscode';
 
 import { resolveSettingPath } from './metadataLocator';
+import { IN_PROCESS_READER } from './metadataReader';
 import { withPackageVersions } from '../../core/adapters/packageVersions';
-import { normalizeMetadata } from '../../core/adapters/registry';
 import { BuildGraph } from '../../core/graph/buildGraph';
-import { fingerprint } from '../../core/hash';
+import { adoptPrecomputed } from '../../core/graph/precomputed';
 import { isAbsolutePath } from '../../core/paths';
-import { isSnapshotLike } from '../../core/schema/validate';
 
 import type { MetadataSource } from './metadataLocator';
+import type { MetadataReader } from './metadataReader';
 import type { BuildSnapshot } from '../../core/schema/snapshot';
 
 export interface LoadedTarget {
@@ -97,7 +97,7 @@ function describe(error: unknown): string {
     return error instanceof Error ? error.message : String(error);
 }
 
-export async function loadTarget(source: MetadataSource): Promise<LoadResult> {
+export async function loadTarget(source: MetadataSource, reader: MetadataReader = IN_PROCESS_READER): Promise<LoadResult> {
     let stat: vscode.FileStat;
     try {
         stat = await vscode.workspace.fs.stat(source.uri);
@@ -108,36 +108,31 @@ export async function loadTarget(source: MetadataSource): Promise<LoadResult> {
         return { ok: false, error: `the file is ${Math.ceil(stat.size / 1024 / 1024)} MB, above the ${Math.round(source.maxBytes / 1024 / 1024)} MB limit set by trueImportCost.maxMetadataSizeMB` };
     }
 
-    let text: string;
+    let bytes: Uint8Array;
     try {
-        const bytes = await vscode.workspace.fs.readFile(source.uri);
-        if (bytes.byteLength > source.maxBytes) {
-            return { ok: false, error: 'the file grew past the size limit while it was read' };
-        }
-        text = new TextDecoder().decode(bytes);
+        bytes = await vscode.workspace.fs.readFile(source.uri);
     } catch (error: unknown) {
         return { ok: false, error: `the file could not be read: ${describe(error)}` };
     }
-
-    let value: unknown;
-    try {
-        value = JSON.parse(text);
-    } catch (error: unknown) {
-        return { ok: false, error: `the file is not valid JSON: ${describe(error)}` };
+    if (bytes.byteLength > source.maxBytes) {
+        return { ok: false, error: 'the file grew past the size limit while it was read' };
     }
 
-    const hash = fingerprint(text);
-    const ownTarget = isSnapshotLike(value) && typeof (value as { target?: unknown }).target === 'string'
-        ? (value as { target: string }).target
-        : undefined;
-    const fallbackId = source.setting?.id ?? ownTarget ?? fileNameOf(source.uri).replace(/\.json$/i, '');
-    const normalized = await normalizeMetadata(value, { target: fallbackId, createdAt: stat.mtime, id: hash });
-    if (!normalized.ok) {
-        return { ok: false, error: normalized.error };
+    const read = await reader.read(bytes, {
+        fileName: fileNameOf(source.uri),
+        modifiedAt: stat.mtime,
+        ...(source.setting?.id === undefined ? {} : { targetId: source.setting.id }),
+    });
+    if (!read.ok) {
+        return { ok: false, error: read.error };
     }
 
-    const baseUri = await resolveBase(source, normalized.snapshot, normalized.adapter);
-    const snapshot = await withPackageVersions(normalized.snapshot, root => readPackageVersion(baseUri, root));
+    const baseUri = await resolveBase(source, read.snapshot, read.adapter);
+    const snapshot = await withPackageVersions(read.snapshot, root => readPackageVersion(baseUri, root));
+    const graph = new BuildGraph(snapshot);
+    if (read.precomputed) {
+        adoptPrecomputed(graph, read.precomputed);
+    }
     return {
         ok: true,
         target: {
@@ -145,10 +140,10 @@ export async function loadTarget(source: MetadataSource): Promise<LoadResult> {
             id: source.setting?.id ?? snapshot.target,
             source,
             snapshot,
-            graph: new BuildGraph(snapshot),
+            graph,
             baseUri,
-            adapter: normalized.adapter,
-            fingerprint: hash,
+            adapter: read.adapter,
+            fingerprint: read.fingerprint,
             loadedAt: Date.now(),
         },
     };

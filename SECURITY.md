@@ -22,8 +22,9 @@ Build metadata is untrusted input:
 - Files larger than `trueImportCost.maxMetadataSizeMB` (64 MB by default) are rejected before they are read.
 - Contents are parsed as JSON only, read into maps rather than plain objects, and validated against a strict schema with limits on the number of modules, imports, chunks and the length of every string.
 - References between modules, imports and outputs are checked for consistency before the module graph is built. Graph traversals visit each module once, so cycles terminate.
+- A file of 512 kB or more is parsed and checked in a worker thread of the extension, with the same checks and limits, so the extension host stays responsive while it is read; the host takes over only a snapshot that has passed them.
 - To trace a named import through a barrel, the extension reads the barrel files along the import's re-exports that the metadata lists: JavaScript and TypeScript files up to 2 MB, parsed as text and never run. A file it cannot read or parse leaves the import's cost at the module level.
-- Text taken from metadata, such as package names and paths, is escaped before it appears in a hover. Hover command links are trusted for the extension's own *Explain Why Included* command only.
+- Text taken from metadata, such as package names and paths, is escaped before it appears in a hover. Hover command links are trusted for the extension's own *Explain Why Included* and measuring commands only, and a measuring command started from a hover goes through the same Workspace Trust check and consent as from the Command Palette.
 - The dashboard is a webview whose content security policy allows only its own script, by nonce, and its own styles. It renders metadata as text, never as HTML, and every message it sends is checked against the message contract before the extension acts on it.
 - Stored baselines, and the snapshots a measured build writes, are validated like any other metadata; stored measurements are checked field by field when they are read back.
 - A file that fails any of these checks is rejected with a message in the log; the last valid snapshot stays in use.
@@ -42,7 +43,23 @@ In measurement mode, which only the `TRUE_IMPORT_COST_MEASURE` environment varia
 
 - The source is MIT licensed and public; releases are built by public GitHub Actions workflows from tagged commits.
 - Dependencies are pinned through `package-lock.json`, updated through Dependabot, and audited with `npm audit`. Install scripts are opt-in through `allowScripts`.
-- Each GitHub release carries the VSIX it published, with a build provenance attestation; npm packages are published with provenance through trusted publishing.
+- Each GitHub release carries the VSIX it published, a build provenance attestation for it, and `SHA256SUMS`, which the release workflow writes from the VSIX on the release once it is published. npm packages are published with provenance through trusted publishing.
+
+## Verifying a release
+
+Download the VSIX and `SHA256SUMS` from the release into one folder, then check the checksum:
+
+```bash
+sha256sum --check --ignore-missing SHA256SUMS
+```
+
+On macOS, use `shasum -a 256 --check --ignore-missing SHA256SUMS`; in PowerShell, compare `(Get-FileHash true-import-cost-1.0.0.vsix).Hash` with the line in `SHA256SUMS`.
+
+To check that the VSIX was built by this repository's release workflow, verify its attestation with the [GitHub CLI](https://cli.github.com/). The release is built by a shared workflow, which signs the attestation:
+
+```bash
+gh attestation verify true-import-cost-1.0.0.vsix --repo Der-Floh/True-Import-Cost --signer-repo Florian-Noever/Florian-Noever
+```
 
 ## Reporting a vulnerability
 

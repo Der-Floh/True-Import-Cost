@@ -59,6 +59,7 @@ const targets = [
     { ...shared, entryPoints: ['src/extension/extension.ts'], outfile: 'out/extension.js', supported: { 'dynamic-import': false }, plugins: [lazyParserPlugin] },
     { ...shared, entryPoints: ['src/parser/index.ts'], outfile: 'out/parser.js', plugins: [] },
     { ...shared, entryPoints: ['src/driver/standaloneMain.ts'], outfile: 'out/standalone.js', plugins: [] },
+    { ...shared, entryPoints: ['src/driver/metadataWorker.ts'], outfile: 'out/metadataWorker.js', plugins: [] },
 ];
 
 async function buildTests() {

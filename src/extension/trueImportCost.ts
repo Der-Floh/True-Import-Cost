@@ -17,6 +17,7 @@ import { HistoryStore } from './services/historyStore';
 import { ImportCostService } from './services/importCosts';
 import { Logger } from './services/logger';
 import { MeasurementStore } from './services/measurementStore';
+import { WorkerMetadataReader } from './services/metadataReader';
 import { affectsMetadataLocation, affectsSettings, readSettings } from './services/settings';
 import { SnapshotStore } from './services/snapshotStore';
 import { StalenessTracker } from './services/staleness';
@@ -56,7 +57,11 @@ export class TrueImportCost implements vscode.Disposable {
         const settings = (): Settings => this.settings;
         const enabled = (): boolean => this.settings.enabled;
 
-        this.store = new SnapshotStore(enabled);
+        const reader = new WorkerMetadataReader({
+            script: vscode.Uri.joinPath(context.extensionUri, 'out', 'metadataWorker.js').fsPath,
+            onFallback: reason => Logger.warn(`Reading build metadata in a background worker failed (${reason}); True Import Cost reads it on the extension host from now on.`),
+        });
+        this.store = new SnapshotStore(enabled, reader);
         const selection = new TargetSelection(context.workspaceState);
         this.analyzer = new DocumentAnalyzer(settings);
         this.staleness = new StalenessTracker();
@@ -100,10 +105,11 @@ export class TrueImportCost implements vscode.Disposable {
             history: this.history,
             settings,
             reload: () => this.reload(),
-            compareWithFile: target => compareWithFile(this.baselines, target),
+            compareWithFile: target => compareWithFile(this.baselines, target, reader),
         });
 
         this.disposables.push(
+            reader,
             this.store,
             selection,
             this.analyzer,

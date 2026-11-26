@@ -4,7 +4,9 @@ import { loadTarget } from '../services/metadataLoader';
 import { addTargetSetting, readFolderSettings } from '../services/settings';
 import { relativePath } from '../../core/paths';
 
-export async function importMetadata(): Promise<void> {
+import type { MetadataReader } from '../services/metadataReader';
+
+export async function importMetadata(reader: MetadataReader): Promise<void> {
     const folders = vscode.workspace.workspaceFolders ?? [];
     const firstFolder = folders[0];
     if (!firstFolder) {
@@ -25,7 +27,7 @@ export async function importMetadata(): Promise<void> {
 
     const containing = vscode.workspace.getWorkspaceFolder(uri);
     const folder = containing ?? firstFolder;
-    const result = await loadTarget({ uri, folder, maxBytes: readFolderSettings(folder).maxMetadataBytes });
+    const result = await loadTarget({ uri, folder, maxBytes: readFolderSettings(folder).maxMetadataBytes }, reader);
     if (!result.ok) {
         void vscode.window.showErrorMessage(`True Import Cost cannot use ${vscode.workspace.asRelativePath(uri)}: ${result.error}.`);
         return;

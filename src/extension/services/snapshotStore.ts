@@ -3,12 +3,14 @@ import * as vscode from 'vscode';
 import { Logger } from './logger';
 import { loadTarget } from './metadataLoader';
 import { locateMetadata } from './metadataLocator';
+import { IN_PROCESS_READER } from './metadataReader';
 import { readFolderSettings } from './settings';
 import { DISCOVERY_GLOB } from '../constants';
 import { relativePath } from '../../core/paths';
 
 import type { LoadedTarget } from './metadataLoader';
 import type { MetadataSource } from './metadataLocator';
+import type { MetadataReader } from './metadataReader';
 
 export interface TargetFailure {
     readonly key: string;
@@ -40,9 +42,11 @@ export class SnapshotStore implements vscode.Disposable {
     private disposed = false;
 
     public readonly onDidChange: vscode.Event<void> = this.changed.event;
+    public readonly reader: MetadataReader;
 
-    public constructor(isEnabled: () => boolean) {
+    public constructor(isEnabled: () => boolean, reader: MetadataReader = IN_PROCESS_READER) {
         this.isEnabled = isEnabled;
+        this.reader = reader;
     }
 
     public targets(): readonly LoadedTarget[] {
@@ -113,7 +117,7 @@ export class SnapshotStore implements vscode.Disposable {
         const key = source.uri.toString();
         const read = (this.reads.get(key) ?? 0) + 1;
         this.reads.set(key, read);
-        const result = await loadTarget(source);
+        const result = await loadTarget(source, this.reader);
         if (this.disposed || !this.sources.has(key) || this.reads.get(key) !== read) {
             return;
         }

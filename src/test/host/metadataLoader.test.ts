@@ -1,14 +1,21 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import * as vscode from 'vscode';
 
+import { exclusionData } from '../../core/graph/exclusion';
+import { graphIndex } from '../../core/graph/graphIndex';
+import { importImpact } from '../../core/graph/impact';
+import { precomputeGraph } from '../../core/graph/precomputed';
+import { readMetadataFile } from '../../core/metadataFile';
 import { loadTarget } from '../../extension/services/metadataLoader';
 import { flushFileReads, setFileReadError, setVirtualFile, setWorkspaceFolders } from '../__mocks__/vscode';
 import { esbuildMetafile, externalImport, staticImport } from './support/metafile';
 import { buildSnapshot, edge } from './support/snapshot';
 import { writeJson, writePackageJson } from './support/workspace';
 
+import type { MetadataFileRequest, MetadataFileResult } from '../../core/metadataFile';
 import type { LoadedTarget, LoadResult } from '../../extension/services/metadataLoader';
 import type { MetadataSource } from '../../extension/services/metadataLocator';
+import type { MetadataReader } from '../../extension/services/metadataReader';
 import type { FakeWorkspaceFolder } from '../__mocks__/vscode';
 
 const MB = 1024 * 1024;
@@ -256,5 +263,51 @@ describe('rejecting metadata', () => {
         setFileReadError('/w/.true-import-cost/app.json', new Error('EACCES: permission denied'));
 
         expect(failure(await loadTarget(source('/w/.true-import-cost/app.json')))).toBe('the file could not be read: EACCES: permission denied');
+    });
+});
+
+describe('reading through a metadata reader', () => {
+    function recordingReader(answer?: (request: MetadataFileRequest) => MetadataFileResult): { readonly reader: MetadataReader; readonly requests: MetadataFileRequest[] } {
+        const requests: MetadataFileRequest[] = [];
+        return {
+            requests,
+            reader: {
+                read: async (bytes, request) => {
+                    requests.push(request);
+                    return answer ? answer(request) : readMetadataFile(bytes, request);
+                },
+                dispose: () => undefined,
+            },
+        };
+    }
+
+    it('hands the reader the file, its name, its time and the target id from the settings', async () => {
+        writeJson('/w/build/meta.json', APP_METAFILE);
+        const { reader, requests } = recordingReader();
+
+        const target = loaded(await loadTarget(source('/w/build/meta.json', { setting: { metadata: 'build/meta.json', id: 'extension-host' } }), reader));
+
+        expect(requests).toEqual([{ fileName: 'meta.json', modifiedAt: expect.any(Number) as unknown, targetId: 'extension-host' }]);
+        expect(target.id).toBe('extension-host');
+    });
+
+    it('uses the graph indexes the reader built', async () => {
+        writeJson('/w/.true-import-cost/app.json', APP_METAFILE);
+        const plain = loaded(await loadTarget(source('/w/.true-import-cost/app.json')));
+        const precomputed = precomputeGraph(plain.snapshot);
+        const { reader } = recordingReader(() => ({ ok: true, snapshot: plain.snapshot, adapter: plain.adapter, fingerprint: plain.fingerprint, precomputed }));
+
+        const target = loaded(await loadTarget(source('/w/.true-import-cost/app.json'), reader));
+
+        expect(graphIndex(target.graph).offsets).toBe(precomputed.structure.offsets);
+        expect(exclusionData(target.graph)).toBe(precomputed.exclusion);
+        expect(importImpact(target.graph, ['src/main.ts'], 'node_modules/lodash/lodash.js')).toEqual(importImpact(plain.graph, ['src/main.ts'], 'node_modules/lodash/lodash.js'));
+    });
+
+    it('reports what the reader could not read', async () => {
+        writeJson('/w/.true-import-cost/app.json', APP_METAFILE);
+        const { reader } = recordingReader(() => ({ ok: false, error: 'True Import Cost stopped before the file was read' }));
+
+        expect(failure(await loadTarget(source('/w/.true-import-cost/app.json'), reader))).toBe('True Import Cost stopped before the file was read');
     });
 });
