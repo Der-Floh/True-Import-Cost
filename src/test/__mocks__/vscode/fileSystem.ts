@@ -21,6 +21,7 @@ const files = new Map<string, VirtualFile>();
 const readErrors = new Map<string, Error>();
 const heldReads = new Map<string, Promise<void>>();
 let reads: string[] = [];
+let writes: string[] = [];
 let watchers: FakeFileSystemWatcher[] = [];
 
 function fileAt(uri: Uri): VirtualFile | undefined {
@@ -63,6 +64,24 @@ export const fs = {
             throw notFound(uri);
         }
         return file.bytes.slice();
+    },
+    writeFile: (uri: Uri, content: Uint8Array): Promise<void> => {
+        writes.push(uri.path);
+        files.set(uri.path, { bytes: content.slice(), mtime: Date.now() });
+        return Promise.resolve();
+    },
+    createDirectory: (_uri: Uri): Promise<void> => Promise.resolve(),
+    delete: (uri: Uri, options: { readonly recursive?: boolean } = {}): Promise<void> => {
+        const prefix = uri.path.endsWith('/') ? uri.path : `${uri.path}/`;
+        const nested = [...files.keys()].filter(path => path.startsWith(prefix));
+        if (!files.has(uri.path) && (nested.length === 0 || options.recursive !== true)) {
+            return Promise.reject(notFound(uri));
+        }
+        files.delete(uri.path);
+        for (const path of nested) {
+            files.delete(path);
+        }
+        return Promise.resolve();
     },
 };
 
@@ -142,6 +161,15 @@ export function fireFileWatcher(change: FileChange, path: string): void {
     }
 }
 
+export function flushFileWrites(): string[] {
+    return writes.splice(0);
+}
+
+export function readVirtualFile(path: string): string | undefined {
+    const file = files.get(path);
+    return file === undefined ? undefined : new TextDecoder().decode(file.bytes);
+}
+
 export function flushFileReads(): string[] {
     return reads.splice(0);
 }
@@ -159,6 +187,7 @@ function posixJoin(base: string, pattern: string): string {
 }
 
 export function resetFileSystem(): void {
+    writes = [];
     files.clear();
     readErrors.clear();
     heldReads.clear();

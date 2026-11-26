@@ -1,21 +1,40 @@
 import * as vscode from 'vscode';
 
+import { compareBuilds } from './compareBuilds';
 import { explainWhyIncluded } from './explainWhyIncluded';
 import { importMetadata } from './importMetadata';
 import { selectTarget } from './selectTarget';
+import { showImporters } from './showImporters';
 import { Command, DISPLAY_NAME } from '../constants';
 import { Logger } from '../services/logger';
 import { setInlayHintsEnabled } from '../services/settings';
 
 import type { ExplainDependencies } from './explainWhyIncluded';
+import type { BaselineStore } from '../services/baselineStore';
+import type { HistoryStore } from '../services/historyStore';
 import type { Settings } from '../services/settings';
 import type { TargetSelection } from '../services/targetSelection';
 
 export interface CommandDependencies extends ExplainDependencies {
     readonly selection: TargetSelection;
     readonly settings: () => Settings;
+    readonly baselines: BaselineStore;
+    readonly history: HistoryStore;
     readonly refresh: () => Promise<void>;
     readonly clearCache: () => Promise<void>;
+    readonly showDashboard: (targetKey?: string) => Promise<void>;
+}
+
+async function clearHistory(history: HistoryStore): Promise<void> {
+    const confirm = 'Clear History';
+    const answer = await vscode.window.showWarningMessage(
+        'Forget the recorded size history of every build target in this workspace?',
+        { modal: true },
+        confirm,
+    );
+    if (answer === confirm) {
+        await history.clearAll();
+    }
 }
 
 function guarded(name: string, run: (...args: unknown[]) => unknown): (...args: unknown[]) => Promise<void> {
@@ -39,6 +58,10 @@ export function registerCommands(dependencies: CommandDependencies): vscode.Disp
         [Command.toggleInlayHints]: () => setInlayHintsEnabled(!dependencies.settings().inlayHints),
         [Command.clearCache]: () => dependencies.clearCache(),
         [Command.showLog]: () => Logger.show(),
+        [Command.showDashboard]: () => dependencies.showDashboard(),
+        [Command.compareBuilds]: () => compareBuilds({ current: dependencies.current, baselines: dependencies.baselines, showDashboard: key => dependencies.showDashboard(key) }),
+        [Command.showImporters]: (argument?: unknown) => showImporters(dependencies, argument),
+        [Command.clearHistory]: () => clearHistory(dependencies.history),
     };
     return Object.entries(handlers).map(([command, handler]) => vscode.commands.registerCommand(command, guarded(command, handler)));
 }

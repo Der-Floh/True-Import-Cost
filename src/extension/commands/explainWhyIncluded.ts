@@ -26,7 +26,7 @@ export function isExplainArguments(value: unknown): value is ExplainArguments {
     return typeof value === 'object' && value !== null && typeof (value as { target?: unknown }).target === 'string';
 }
 
-function argumentsOf(value: unknown): ExplainArguments | undefined {
+export function argumentsOf(value: unknown): ExplainArguments | undefined {
     if (isExplainArguments(value)) {
         return value;
     }
@@ -34,7 +34,7 @@ function argumentsOf(value: unknown): ExplainArguments | undefined {
     return isExplainArguments(nested) ? nested : undefined;
 }
 
-async function fromActiveEditor(dependencies: ExplainDependencies): Promise<ExplainArguments | undefined> {
+export async function fromActiveEditor(dependencies: Pick<ExplainDependencies, 'service'>): Promise<ExplainArguments | undefined> {
     const editor = vscode.window.activeTextEditor;
     if (!editor) {
         return undefined;

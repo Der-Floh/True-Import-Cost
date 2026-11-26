@@ -1,6 +1,9 @@
 import * as vscode from 'vscode';
 
 import { SETTINGS_SECTION } from '../constants';
+import { parseBudgets } from '../../core/budgets';
+
+import type { Budget } from '../../core/budgets';
 
 export interface TargetSetting {
     readonly id?: string;
@@ -22,6 +25,8 @@ export interface Settings {
     readonly usageAnalysis: boolean;
     readonly debounceMs: number;
     readonly duplicateDiagnostics: boolean;
+    readonly budgets: ReadonlyMap<string, Budget>;
+    readonly historyEnabled: boolean;
 }
 
 export interface FolderSettings {
@@ -43,6 +48,8 @@ const Key = {
     debounceMs: 'analysis.debounceMs',
     duplicateDiagnostics: 'diagnostics.duplicatePackages',
     maxMetadataSizeMB: 'maxMetadataSizeMB',
+    budgets: 'budgets',
+    historyEnabled: 'history.enabled',
 } as const;
 
 const DEFAULT_DEBOUNCE_MS = 300;
@@ -104,6 +111,8 @@ export function readSettings(): Settings {
         usageAnalysis: readBoolean(configuration, Key.usageAnalysis, true),
         debounceMs: Math.round(readNumber(configuration, Key.debounceMs, DEFAULT_DEBOUNCE_MS, 0, MAX_DEBOUNCE_MS)),
         duplicateDiagnostics: readBoolean(configuration, Key.duplicateDiagnostics, true),
+        budgets: parseBudgets(configuration.get(Key.budgets)),
+        historyEnabled: readBoolean(configuration, Key.historyEnabled, true),
     };
 }
 

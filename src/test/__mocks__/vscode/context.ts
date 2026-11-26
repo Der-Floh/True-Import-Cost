@@ -29,5 +29,7 @@ export function createExtensionContext(): vscode.ExtensionContext {
         workspaceState: new FakeMemento(),
         globalState: new FakeMemento(),
         extensionUri: Uri.file('/extension'),
+        storageUri: Uri.file('/storage/workspace'),
+        globalStorageUri: Uri.file('/storage/global'),
     } as unknown as vscode.ExtensionContext;
 }

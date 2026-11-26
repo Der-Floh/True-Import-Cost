@@ -107,6 +107,29 @@
                 "command": "trueImportCost.showLog",
                 "title": "Show Log",
                 "category": "True Import Cost"
+            },
+            {
+                "command": "trueImportCost.showDashboard",
+                "title": "Show Bundle Dashboard",
+                "category": "True Import Cost",
+                "icon": "$(graph)"
+            },
+            {
+                "command": "trueImportCost.compareBuilds",
+                "title": "Compare Builds",
+                "category": "True Import Cost",
+                "icon": "$(diff)"
+            },
+            {
+                "command": "trueImportCost.showImporters",
+                "title": "Show Importers",
+                "category": "True Import Cost",
+                "icon": "$(references)"
+            },
+            {
+                "command": "trueImportCost.clearHistory",
+                "title": "Clear Build History",
+                "category": "True Import Cost"
             }
         ],
         "menus": {
@@ -114,9 +137,18 @@
                 {
                     "command": "trueImportCost.explainWhyIncluded",
                     "when": "editorLangId =~ /^(javascript|javascriptreact|typescript|typescriptreact|vue)$/"
+                },
+                {
+                    "command": "trueImportCost.showImporters",
+                    "when": "editorLangId =~ /^(javascript|javascriptreact|typescript|typescriptreact|vue)$/"
                 }
             ],
             "view/title": [
+                {
+                    "command": "trueImportCost.showDashboard",
+                    "when": "view == trueImportCost.packages",
+                    "group": "navigation@0"
+                },
                 {
                     "command": "trueImportCost.selectTarget",
                     "when": "view == trueImportCost.packages",
@@ -136,6 +168,11 @@
             "view/item/context": [
                 {
                     "command": "trueImportCost.explainWhyIncluded",
+                    "when": "view == trueImportCost.packages && viewItem =~ /^(package|module)$/",
+                    "group": "inline"
+                },
+                {
+                    "command": "trueImportCost.showImporters",
                     "when": "view == trueImportCost.packages && viewItem =~ /^(package|module)$/",
                     "group": "inline"
                 }
@@ -271,6 +308,69 @@
                     "maximum": 1024,
                     "markdownDescription": "Largest metadata file that is read, in megabytes. Larger files are rejected rather than parsed.",
                     "scope": "resource"
+                },
+                "trueImportCost.budgets": {
+                    "type": "object",
+                    "default": {},
+                    "markdownDescription": "Size budgets per build target, keyed by target name, or `*` for every target. Sizes are bytes or text such as `30 kB`, `1.5 MB` or `500 KiB`. An import or package over budget gets a warning; totals over budget show in the status bar and the dashboard.",
+                    "scope": "resource",
+                    "additionalProperties": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                            "total": {
+                                "type": [
+                                    "string",
+                                    "number"
+                                ],
+                                "markdownDescription": "Largest total output: JavaScript, CSS and other assets."
+                            },
+                            "initial": {
+                                "type": [
+                                    "string",
+                                    "number"
+                                ],
+                                "markdownDescription": "Largest initial load: the entry chunks, what they import statically, and their CSS."
+                            },
+                            "javascript": {
+                                "type": [
+                                    "string",
+                                    "number"
+                                ],
+                                "markdownDescription": "Largest amount of JavaScript."
+                            },
+                            "css": {
+                                "type": [
+                                    "string",
+                                    "number"
+                                ],
+                                "markdownDescription": "Largest amount of CSS."
+                            },
+                            "import": {
+                                "type": [
+                                    "string",
+                                    "number"
+                                ],
+                                "markdownDescription": "Largest bundled size of a single import, with what it pulls in."
+                            },
+                            "packages": {
+                                "type": "object",
+                                "markdownDescription": "Largest size of a package, keyed by package name. `*` matches any characters, as in `lodash*`. `0` forbids a package.",
+                                "additionalProperties": {
+                                    "type": [
+                                        "string",
+                                        "number"
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                },
+                "trueImportCost.history.enabled": {
+                    "type": "boolean",
+                    "default": true,
+                    "markdownDescription": "Record the size of each new build of each target, for the history chart of the dashboard. The history is kept in VS Code's storage for this workspace, never in the workspace itself.",
+                    "scope": "window"
                 }
             }
         }

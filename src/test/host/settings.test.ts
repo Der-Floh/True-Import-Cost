@@ -37,6 +37,8 @@ describe('readSettings', () => {
             usageAnalysis: declared['trueImportCost.analysis.usageAnalysis'].default,
             debounceMs: declared['trueImportCost.analysis.debounceMs'].default,
             duplicateDiagnostics: declared['trueImportCost.diagnostics.duplicatePackages'].default,
+            budgets: new Map(),
+            historyEnabled: declared['trueImportCost.history.enabled'].default,
         });
     });
 
@@ -50,6 +52,8 @@ describe('readSettings', () => {
         setSetting('trueImportCost.analysis.usageAnalysis', false);
         setSetting('trueImportCost.analysis.debounceMs', 50);
         setSetting('trueImportCost.diagnostics.duplicatePackages', false);
+        setSetting('trueImportCost.budgets', { webview: { initial: '600 kB', packages: { moment: 0 } } });
+        setSetting('trueImportCost.history.enabled', false);
 
         expect(readSettings()).toEqual({
             enabled: false,
@@ -58,6 +62,8 @@ describe('readSettings', () => {
             usageAnalysis: false,
             debounceMs: 50,
             duplicateDiagnostics: false,
+            budgets: new Map([['webview', { initial: 600_000, packages: new Map([['moment', 0]]) }]]),
+            historyEnabled: false,
         });
     });
 

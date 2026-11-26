@@ -6,6 +6,7 @@ import { resetFileSystem } from './vscode/fileSystem';
 import { resetFolders } from './vscode/folders';
 import { resetLanguages } from './vscode/languages';
 import { resetWindow } from './vscode/window';
+import { resetWebviews } from './vscode/webview';
 import { resetWorkspace } from './vscode/workspace';
 
 export { commands, flushExecutedCommands, registeredCommands } from './vscode/commands';
@@ -29,6 +30,8 @@ export { CancellationTokenSource, Disposable, emitterListenerCount, EventEmitter
 export {
     fireFileWatcher,
     flushFileReads,
+    flushFileWrites,
+    readVirtualFile,
     FileType,
     holdFileRead,
     removeVirtualFile,
@@ -63,6 +66,7 @@ export {
     flushLogs,
     flushOpenDialogs,
     flushQuickPicks,
+    flushShownDocuments,
     flushWarningMessages,
     outputChannels,
     QuickPickItemKind,
@@ -70,12 +74,15 @@ export {
     setInputBoxAnswer,
     setOpenDialogAnswer,
     setQuickPickChoice,
+    setWarningMessageAnswer,
     StatusBarAlignment,
     statusBarItems,
     treeViews,
     window,
 } from './vscode/window';
 export type { InputBoxOptions, QuickPickItemLike, QuickPickRecord } from './vscode/window';
+export { FakeWebview, FakeWebviewPanel, ViewColumn, webviewPanels } from './vscode/webview';
+export type { WebviewPanelOptions } from './vscode/webview';
 export { flushFileSearches, setWorkspaceTrusted, workspace } from './vscode/workspace';
 export type { FileSearch } from './vscode/workspace';
 
@@ -88,5 +95,6 @@ export function resetMocks(): void {
     resetFolders();
     resetLanguages();
     resetWindow();
+    resetWebviews();
     resetWorkspace();
 }

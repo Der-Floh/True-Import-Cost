@@ -130,8 +130,8 @@ export class FakeTextDocument {
         return this.lineStarts().length;
     }
 
-    public getText(): string {
-        return this.text;
+    public getText(range?: Range): string {
+        return range === undefined ? this.text : this.text.slice(this.offsetAt(range.start), this.offsetAt(range.end));
     }
 
     public positionAt(offset: number): Position {

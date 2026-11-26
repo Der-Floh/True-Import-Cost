@@ -4,6 +4,7 @@ import { hostEvent } from './events';
 import { createFileSystemWatcher, fs, virtualFilePaths } from './fileSystem';
 import { asRelativePath, getWorkspaceFolder, onDidChangeWorkspaceFolders, workspaceFolders } from './folders';
 import { globMatcher, isWithin, relativeTo, sameRoot, Uri } from './uri';
+import { openTextDocument } from './window';
 
 import type { Disposable } from './events';
 import type { RelativePattern } from './uri';
@@ -69,6 +70,7 @@ export const workspace = {
     onDidCloseTextDocument,
     onDidChangeTextDocument,
     onDidSaveTextDocument,
+    openTextDocument,
 };
 
 export function setWorkspaceTrusted(isTrusted: boolean): void {

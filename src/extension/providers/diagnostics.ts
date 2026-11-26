@@ -1,14 +1,21 @@
 import * as vscode from 'vscode';
 
 import { Command, DISPLAY_NAME, SUPPORTED_LANGUAGES } from '../constants';
+import { budgetFor, packageLimit } from '../../core/budgets';
 import { formatBytes } from '../../core/format';
 
+import type { Budget } from '../../core/budgets';
 import type { DuplicatePackage } from '../../core/graph/duplicates';
+import type { LoadedTarget } from '../services/metadataLoader';
 import type { ExplainArguments } from '../presentation/hoverContent';
-import type { ImportCostService } from '../services/importCosts';
+import type { ImportCostEntry, ImportCostService } from '../services/importCosts';
 import type { Settings } from '../services/settings';
 
 export const DUPLICATE_PACKAGE_CODE = 'duplicate-package';
+
+export const IMPORT_BUDGET_CODE = 'import-budget';
+
+export const PACKAGE_BUDGET_CODE = 'package-budget';
 
 const SUPPORTED: ReadonlySet<string> = new Set(SUPPORTED_LANGUAGES);
 
@@ -19,7 +26,53 @@ export function duplicateMessage(duplicate: DuplicatePackage, target: string): s
     return `${duplicate.name} is bundled ${duplicate.instances.length} times in "${target}": ${versions}. Together ${formatBytes(duplicate.bytes)}.`;
 }
 
-export class DuplicatePackageDiagnostics implements vscode.Disposable {
+function packageBytes(target: LoadedTarget, name: string): number {
+    let bytes = 0;
+    for (const instance of target.graph.packages().values()) {
+        if (instance.name === name) {
+            bytes += instance.bytes;
+        }
+    }
+    return bytes;
+}
+
+interface Finding {
+    readonly message: string;
+    readonly severity: vscode.DiagnosticSeverity;
+    readonly code: string;
+}
+
+function findingsFor(entry: ImportCostEntry, target: LoadedTarget, settings: Settings, budget: Budget | undefined): Finding[] {
+    const cost = entry.cost;
+    if (cost.status !== 'bundled' && cost.status !== 'tree-shaken') {
+        return [];
+    }
+    const findings: Finding[] = [];
+    if (settings.duplicateDiagnostics && cost.duplicate) {
+        findings.push({ message: duplicateMessage(cost.duplicate, target.id), severity: vscode.DiagnosticSeverity.Information, code: DUPLICATE_PACKAGE_CODE });
+    }
+    if (budget?.import !== undefined && cost.impact.bundledBytes > budget.import) {
+        findings.push({
+            message: `${entry.source.specifier} pulls ${formatBytes(cost.impact.bundledBytes)} into "${target.id}", over the import budget of ${formatBytes(budget.import)}.`,
+            severity: vscode.DiagnosticSeverity.Warning,
+            code: IMPORT_BUDGET_CODE,
+        });
+    }
+    const limit = budget === undefined || cost.package === undefined ? undefined : packageLimit(budget, cost.package.name);
+    if (limit !== undefined && cost.package !== undefined) {
+        const bytes = packageBytes(target, cost.package.name);
+        if (bytes > limit) {
+            findings.push({
+                message: `${cost.package.name} is ${formatBytes(bytes)} in "${target.id}", over its budget of ${formatBytes(limit)}.`,
+                severity: vscode.DiagnosticSeverity.Warning,
+                code: PACKAGE_BUDGET_CODE,
+            });
+        }
+    }
+    return findings;
+}
+
+export class BundleDiagnostics implements vscode.Disposable {
     private readonly service: ImportCostService;
     private readonly settings: () => Settings;
     private readonly collection = vscode.languages.createDiagnosticCollection('trueImportCost');
@@ -53,7 +106,7 @@ export class DuplicatePackageDiagnostics implements vscode.Disposable {
         this.pending.set(key, cancellation);
         try {
             const settings = this.settings();
-            if (!SUPPORTED.has(document.languageId) || !settings.enabled || !settings.duplicateDiagnostics) {
+            if (!SUPPORTED.has(document.languageId) || !settings.enabled) {
                 this.collection.delete(document.uri);
                 return;
             }
@@ -65,20 +118,23 @@ export class DuplicatePackageDiagnostics implements vscode.Disposable {
                 this.collection.delete(document.uri);
                 return;
             }
+            const budget = budgetFor(settings.budgets, costs.target.id);
             const diagnostics: vscode.Diagnostic[] = [];
             for (const entry of costs.entries) {
-                const cost = entry.cost;
-                if ((cost.status !== 'bundled' && cost.status !== 'tree-shaken') || !cost.duplicate) {
+                const findings = findingsFor(entry, costs.target, settings, budget);
+                if (findings.length === 0) {
                     continue;
                 }
                 const range = new vscode.Range(
                     document.positionAt(entry.source.specifierRange.start),
                     document.positionAt(entry.source.specifierRange.end),
                 );
-                const diagnostic = new vscode.Diagnostic(range, duplicateMessage(cost.duplicate, costs.target.id), vscode.DiagnosticSeverity.Information);
-                diagnostic.source = DISPLAY_NAME;
-                diagnostic.code = DUPLICATE_PACKAGE_CODE;
-                diagnostics.push(diagnostic);
+                for (const finding of findings) {
+                    const diagnostic = new vscode.Diagnostic(range, finding.message, finding.severity);
+                    diagnostic.source = DISPLAY_NAME;
+                    diagnostic.code = finding.code;
+                    diagnostics.push(diagnostic);
+                }
             }
             this.collection.set(document.uri, diagnostics);
         } finally {

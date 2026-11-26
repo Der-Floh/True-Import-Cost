@@ -47,6 +47,10 @@ export class ImportCostService {
         return this.selection.pick(this.targetsFor(document));
     }
 
+    public analyze(document: vscode.TextDocument, token: vscode.CancellationToken): Promise<DocumentAnalysis | undefined> {
+        return this.analyzer.analyze(document, token);
+    }
+
     public costIn(target: LoadedTarget, documentUri: vscode.Uri, source: SourceImport): ImportCost | undefined {
         const path = documentPathIn(target.baseUri, documentUri);
         const location = path === undefined ? undefined : locateDocument(target.graph, path);

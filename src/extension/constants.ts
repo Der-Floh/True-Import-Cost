@@ -14,6 +14,10 @@ export const Command = {
     toggleInlayHints: 'trueImportCost.toggleInlayHints',
     clearCache: 'trueImportCost.clearCache',
     showLog: 'trueImportCost.showLog',
+    showDashboard: 'trueImportCost.showDashboard',
+    compareBuilds: 'trueImportCost.compareBuilds',
+    showImporters: 'trueImportCost.showImporters',
+    clearHistory: 'trueImportCost.clearHistory',
 } as const;
 
 export const View = {

@@ -1,10 +1,12 @@
 import { hostEvent } from './events';
-import { Position, Selection } from './documents';
+import { FakeTextDocument, openDocument, Position, Selection, textDocuments } from './documents';
+import { readVirtualFile } from './fileSystem';
+import { type Uri } from './uri';
+import { createWebviewPanel } from './webview';
 
 import type { MarkdownString } from './content';
-import type { FakeTextDocument } from './documents';
 import type { Disposable } from './events';
-import type { Uri } from './uri';
+import type { Range } from './documents';
 
 export const StatusBarAlignment = { Left: 1, Right: 2 } as const;
 
@@ -151,6 +153,16 @@ let inputBoxes: InputBoxOptions[] = [];
 let inputBoxAnswer: string | undefined;
 let openDialogs: Readonly<Record<string, unknown>>[] = [];
 let openDialogAnswer: Uri[] | undefined;
+let warningAnswer: string | undefined;
+let shownDocuments: { readonly path: string; readonly selection?: Range }[] = [];
+
+function documentFor(target: Uri | FakeTextDocument): FakeTextDocument {
+    if (target instanceof FakeTextDocument) {
+        return target;
+    }
+    const open = textDocuments().find(document => document.uri.toString() === target.toString());
+    return open ?? openDocument(target, readVirtualFile(target.path) ?? '');
+}
 
 export const window = {
     get activeTextEditor(): FakeTextEditor | undefined {
@@ -176,9 +188,9 @@ export const window = {
         informationMessages.push(message);
         return Promise.resolve(undefined);
     },
-    showWarningMessage: (message: string): Promise<undefined> => {
+    showWarningMessage: (message: string, ...rest: unknown[]): Promise<string | undefined> => {
         warningMessages.push(message);
-        return Promise.resolve(undefined);
+        return Promise.resolve(rest.includes(warningAnswer) ? warningAnswer : undefined);
     },
     showErrorMessage: (message: string): Promise<undefined> => {
         errorMessages.push(message);
@@ -198,7 +210,28 @@ export const window = {
         openDialogs.push(options);
         return Promise.resolve(openDialogAnswer);
     },
+    showTextDocument: (target: Uri | FakeTextDocument, options: { readonly selection?: Range } = {}): Promise<FakeTextEditor> => {
+        const document = documentFor(target);
+        shownDocuments.push({ path: document.uri.path, ...(options.selection === undefined ? {} : { selection: options.selection }) });
+        const start = options.selection?.start ?? new Position(0, 0);
+        activeEditor = new FakeTextEditor(document, new Selection(start, options.selection?.end ?? start));
+        activeEditorChanged.fire(activeEditor);
+        return Promise.resolve(activeEditor);
+    },
+    createWebviewPanel,
 };
+
+export function openTextDocument(target: Uri): Promise<FakeTextDocument> {
+    return Promise.resolve(documentFor(target));
+}
+
+export function setWarningMessageAnswer(answer: string | undefined): void {
+    warningAnswer = answer;
+}
+
+export function flushShownDocuments(): { readonly path: string; readonly selection?: Range }[] {
+    return shownDocuments.splice(0);
+}
 
 export function setActiveTextEditor(document: FakeTextDocument | undefined, cursor: number | Position = 0): FakeTextEditor | undefined {
     if (document === undefined) {
@@ -277,4 +310,6 @@ export function resetWindow(): void {
     inputBoxAnswer = undefined;
     openDialogs = [];
     openDialogAnswer = undefined;
+    warningAnswer = undefined;
+    shownDocuments = [];
 }
