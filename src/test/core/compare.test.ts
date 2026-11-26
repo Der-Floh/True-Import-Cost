@@ -1,0 +1,105 @@
+import { describe, expect, it } from 'vitest';
+
+import { chunkRecord, fixture, inPackage } from './support/snapshot';
+import { chunkKey, compareBuilds } from '../../core/compare';
+
+function baseline() {
+    return fixture()
+        .module('src/main.ts', 100, { entry: true, chunk: 'assets/index-AB12cd34.js' })
+        .module('node_modules/lodash-es/debounce.js', 900, { ...inPackage('lodash-es', '4.17.20'), chunk: 'assets/index-AB12cd34.js' })
+        .module('node_modules/moment/moment.js', 5000, { ...inPackage('moment', '2.29.0'), chunk: 'assets/index-AB12cd34.js' })
+        .module('node_modules/vue/index.js', 2000, { ...inPackage('vue', '3.5.0'), chunk: 'assets/index-AB12cd34.js' })
+        .chunk({ id: 'assets/index-AB12cd34.js', bytes: 8000, entry: true, entryModule: 'src/main.ts' })
+        .chunk({ id: 'assets/Lazy-Qq9ZxY10.js', bytes: 300, dynamicEntry: true })
+        .graph();
+}
+
+function current() {
+    return fixture()
+        .module('src/main.ts', 120, { entry: true, chunk: 'assets/index-ZZ99yy88.js' })
+        .module('node_modules/lodash-es/debounce.js', 950, { ...inPackage('lodash-es', '4.17.21'), chunk: 'assets/index-ZZ99yy88.js' })
+        .module('node_modules/dayjs/dayjs.js', 700, { ...inPackage('dayjs', '1.11.0'), chunk: 'assets/index-ZZ99yy88.js' })
+        .module('node_modules/vue/index.js', 2000, { ...inPackage('vue', '3.5.0'), chunk: 'assets/index-ZZ99yy88.js' })
+        .chunk({ id: 'assets/index-ZZ99yy88.js', bytes: 3800, entry: true, entryModule: 'src/main.ts' })
+        .chunk({ id: 'assets/Lazy-Rr0ZxY11.js', bytes: 280, dynamicEntry: true })
+        .graph();
+}
+
+describe('comparing two builds of a target', () => {
+    it('reports the totals of both builds', () => {
+        const comparison = compareBuilds(baseline(), current());
+
+        expect(comparison.before.javascript).toBe(8300);
+        expect(comparison.after.javascript).toBe(4080);
+    });
+
+    it('lists added, removed, changed and unchanged packages, largest change first', () => {
+        const packages = compareBuilds(baseline(), current()).packages;
+
+        expect(packages.map(item => [item.name, item.status, item.delta])).toEqual([
+            ['moment', 'removed', -5000],
+            ['dayjs', 'added', 700],
+            ['lodash-es', 'changed', 50],
+            ['vue', 'unchanged', 0],
+        ]);
+    });
+
+    it('records version changes, and calls a package whose version changed changed even at the same size', () => {
+        const before = fixture().module('node_modules/a/i.js', 10, inPackage('a', '1.0.0')).graph();
+        const after = fixture().module('node_modules/a/i.js', 10, inPackage('a', '2.0.0')).graph();
+        const [change] = compareBuilds(before, after).packages;
+
+        expect(change).toMatchObject({ status: 'changed', delta: 0, versionsBefore: ['1.0.0'], versionsAfter: ['2.0.0'] });
+    });
+
+    it('adds the instances of a package installed twice together', () => {
+        const after = fixture()
+            .module('node_modules/a/i.js', 10, inPackage('a', '1.0.0'))
+            .module('node_modules/b/node_modules/a/i.js', 15, inPackage('a', '2.0.0', 'node_modules/b/node_modules/a'))
+            .graph();
+        const [change] = compareBuilds(fixture().graph(), after).packages;
+
+        expect(change).toMatchObject({ name: 'a', after: 25, versionsAfter: ['1.0.0', '2.0.0'], status: 'added' });
+    });
+
+    it('matches chunks across builds by entry module, or by file name without its content hash', () => {
+        const chunks = compareBuilds(baseline(), current()).chunks;
+
+        expect(chunks.map(item => [item.key, item.before, item.after, item.delta])).toEqual([
+            ['js:src/main.ts', 'assets/index-AB12cd34.js', 'assets/index-ZZ99yy88.js', -4200],
+            ['js:assets/Lazy.js', 'assets/Lazy-Qq9ZxY10.js', 'assets/Lazy-Rr0ZxY11.js', -20],
+        ]);
+    });
+
+    it('lists the modules that changed, largest change first, and only those', () => {
+        const modules = compareBuilds(baseline(), current()).modules;
+
+        expect(modules.map(item => [item.id, item.delta])).toEqual([
+            ['node_modules/moment/moment.js', -5000],
+            ['node_modules/dayjs/dayjs.js', 700],
+            ['node_modules/lodash-es/debounce.js', 50],
+            ['src/main.ts', 20],
+        ]);
+    });
+
+    it('caps the module list', () => {
+        expect(compareBuilds(baseline(), current(), 2).modules).toHaveLength(2);
+    });
+});
+
+describe('the key a chunk is matched by', () => {
+    it.each([
+        ['assets/index-DDhTxJY7.js', 'js:assets/index.js'],
+        ['assets/Lazy-n-ewKlwO.js', 'js:assets/Lazy.js'],
+        ['dist/lazy-EQO2KQQD.js', 'js:dist/lazy.js'],
+        ['dist/extension.js', 'js:dist/extension.js'],
+        ['assets/my-component.js', 'js:assets/my-component.js'],
+        ['assets/settings.js', 'js:assets/settings.js'],
+    ])('keys %s as %s', (id, key) => {
+        expect(chunkKey(chunkRecord({ id, bytes: 1 }))).toBe(key);
+    });
+
+    it('prefers the entry module', () => {
+        expect(chunkKey(chunkRecord({ id: 'assets/x-AAAA1111.css', bytes: 1, entryModule: 'src/a.ts' }))).toBe('css:src/a.ts');
+    });
+});
