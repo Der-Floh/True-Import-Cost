@@ -1,6 +1,6 @@
 {
     "name": "@true-import-cost/cli",
-    "version": "0.1.0",
+    "version": "1.0.0",
     "description": "Command-line tool that summarises, compares and checks the size of your production build in CI, from the metadata your bundler writes",
     "license": "MIT",
     "repository": {

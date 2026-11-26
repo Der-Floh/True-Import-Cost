@@ -1,6 +1,6 @@
 # Roadmap
 
-Each release produces something useful on its own. Version 0.1.0 covers the first five milestones.
+Each release produces something useful on its own. Version 1.0.0, the first release, covers all of them.
 
 ## v0.1 — Core MVP ✅
 
@@ -49,8 +49,8 @@ Each release produces something useful on its own. Version 0.1.0 covers the firs
 - [x] Webpack and Rspack adapters (`@true-import-cost/webpack`)
 - [x] A CLI for CI pipelines (`@true-import-cost/cli`: summary, compare, budget check)
 
-## v1.0 — Stable release
+## v1.0 — Stable release ✅
 
-- [ ] Stable snapshot schema and adapter API for third-party bundler adapters
-- [ ] Performance budgets for large graphs, with the graph built in a background worker
-- [ ] Published VSIX checksums alongside the release attestations
+- [x] Stable snapshot schema and adapter API for third-party bundler adapters: `@true-import-cost/snapshot`, a JSON Schema and a [guide](writing-a-plugin.md)
+- [x] Performance budgets for large graphs, with the graph built in a background worker
+- [x] Published VSIX checksums alongside the release attestations

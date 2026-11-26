@@ -2,9 +2,9 @@
 
 All notable changes to True Import Cost are documented here. The extension, the bundler plugins and the CLI share this file; package entries name their package.
 
-## 0.1.0
+## 1.0.0
 
-The first release. It covers milestones v0.1 to v0.5 of the [roadmap](docs/roadmap.md): the core extension, Vite and Vue support, the dependency graph, the dashboard with build comparisons, and advanced cost analysis.
+The first release. It covers the whole [roadmap](docs/roadmap.md), v0.1 to v1.0: the core extension, Vite and Vue support, the dependency graph, the dashboard with build comparisons, advanced cost analysis, and a stable snapshot format that plugins for any bundler can write.
 
 ### Extension
 
@@ -32,25 +32,34 @@ The first release. It covers milestones v0.1 to v0.5 of the [roadmap](docs/roadm
 - Measure Import by Building Without It: builds the target once as is and once without the import, through the plugin's measurement mode, and the hover shows how much smaller the build is. It runs only when you ask, in a trusted workspace, after you allow the command, and never writes the build output
 - Measured costs from two builds of your own: when the build after the pinned baseline differs from it by exactly one import, the hover shows the difference
 - Measure Standalone Size of the Imported Package: the imported names and their package bundled by themselves with the project's esbuild or Rolldown, minified and gzipped
+- Large builds: metadata files of 512 kB or more are read, validated and indexed in a worker thread, so the extension host stays responsive, and exclusive bytes come from a dominator tree built once per build instead of a walk of the whole build per import. For a synthetic build of 60,000 modules, the imports of the first document cost under a second
+- Each GitHub release carries `SHA256SUMS` for its VSIX next to the build provenance attestation; [SECURITY.md](SECURITY.md#verifying-a-release) shows how to check both
+- The snapshot format is stable within schema version 1 ([Stability](docs/snapshot-schema.md#stability)). A snapshot of a newer version is rejected with a message to update the extension or the CLI, and a file of another format says it is not a True Import Cost build snapshot. A snapshot whose chunks name an output it does not list is rejected
 
-### `@true-import-cost/esbuild` 0.1.0
+### `@true-import-cost/snapshot` 1.0.0
+
+- New package for writing a True Import Cost plugin for any other bundler: the format's types and constants, `SnapshotBuilder`, `parseSnapshot`, `withPackageVersions`, `writeSnapshot`, the target and root helpers, and the measurement protocol. No dependencies; Node.js 18 and later
+- `build-snapshot.schema.json`: the format as a JSON Schema (draft 2020-12), generated from the validation
+- [Writing a plugin for another bundler](docs/writing-a-plugin.md), with a complete example
+
+### `@true-import-cost/esbuild` 1.0.0
 
 - Turns on the metafile and writes a normalised snapshot with the esbuild version, the build mode and package versions after every successful build
 - Measurement mode for True Import Cost's measured costs: with `TRUE_IMPORT_COST_MEASURE` set, takes one import out of a file in memory, writes no output, and puts its snapshot in a temporary folder
 
-### `@true-import-cost/vite` 0.1.0
+### `@true-import-cost/vite` 1.0.0
 
 - Writes a snapshot after every production build, for Rollup-based Vite and Rolldown-based Vite 8
 - Per-module sizes from rendered lengths scaled to the minified chunk, or from the source maps when the build writes them
 - CSS split across the stylesheets and Vue style blocks that produced it; emitted assets attributed to the modules they came from
 - Measurement mode for True Import Cost's measured costs: with `TRUE_IMPORT_COST_MEASURE` set, takes one import out of a file in memory, writes no output, and puts its snapshot in a temporary folder
 
-### `@true-import-cost/webpack` 0.1.0
+### `@true-import-cost/webpack` 1.0.0
 
 - New plugin for webpack 5 and Rspack 1 and 2: writes a True Import Cost snapshot after every successful build, with per-module sizes from the source maps when the build writes them
 - Measurement mode for True Import Cost's measured costs: with `TRUE_IMPORT_COST_MEASURE` set, a loader takes one import out of a file in memory, and nothing is emitted or cleaned
 
-### `@true-import-cost/cli` 0.1.0
+### `@true-import-cost/cli` 1.0.0
 
 - `true-import-cost summary`, `compare` and `check` for CI pipelines, reading the same metadata as the extension: True Import Cost snapshots, esbuild metafiles and any other supported build metadata
 - `summary`: total, JavaScript, CSS, other assets, initial and lazily loaded sizes, the largest packages with their versions, and duplicate packages

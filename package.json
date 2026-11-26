@@ -14,7 +14,7 @@
     },
     "homepage": "https://github.com/Der-Floh/True-Import-Cost",
     "qna": "https://github.com/Der-Floh/True-Import-Cost/issues",
-    "version": "0.1.0",
+    "version": "1.0.0",
     "engines": {
         "vscode": "^1.100.0"
     },

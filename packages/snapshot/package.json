@@ -1,6 +1,6 @@
 {
     "name": "@true-import-cost/snapshot",
-    "version": "0.1.0",
+    "version": "1.0.0",
     "description": "Build, check and write True Import Cost build snapshots from a plugin for any bundler, so the True Import Cost VS Code extension and CLI can read its builds",
     "license": "MIT",
     "repository": {

@@ -1,6 +1,6 @@
 {
     "name": "@true-import-cost/vite",
-    "version": "0.1.0",
+    "version": "1.0.0",
     "description": "Vite plugin that records what your production build contains, for the True Import Cost VS Code extension",
     "license": "MIT",
     "repository": {
