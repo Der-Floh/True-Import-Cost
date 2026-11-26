@@ -82,7 +82,7 @@ suite('True Import Cost in VS Code', () => {
         }, 'the import hover');
 
         assert.match(text, /big-library/);
-        assert.match(text, /3\.2\.0/);
+        assert.match(text, /3\\?\.2\\?\.0/);
     });
 
     test('reports a package that is bundled in two versions', async () => {

@@ -104,7 +104,7 @@ function languageOf(lang: string | undefined): ScriptLanguage {
 export function analyzeVue(text: string, options: AnalyzeOptions): SourceImport[] {
     let root: RootNode;
     try {
-        root = parse(text, { parseMode: 'sfc', prefixIdentifiers: true, comments: false });
+        root = parse(text, { parseMode: 'sfc', prefixIdentifiers: true, comments: false, onError: () => undefined, onWarn: () => undefined });
     } catch {
         return [];
     }

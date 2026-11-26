@@ -173,15 +173,12 @@ function collectCall(call: ts.CallExpression, kind: 'dynamic' | 'require', liter
     return { ...base, kind, node: call, bindings: [] };
 }
 
-function isShadowedRequire(call: ts.CallExpression, checker: ts.TypeChecker | undefined): boolean {
-    if (!checker) {
-        return false;
-    }
-    const symbol = checker.getSymbolAtLocation(call.expression);
+function isShadowedRequire(call: ts.CallExpression, checker: () => ts.TypeChecker): boolean {
+    const symbol = checker().getSymbolAtLocation(call.expression);
     return (symbol?.declarations?.length ?? 0) > 0;
 }
 
-function collectImports(sourceFile: ts.SourceFile, checker: ts.TypeChecker | undefined): PendingImport[] {
+function collectImports(sourceFile: ts.SourceFile, checker: () => ts.TypeChecker): PendingImport[] {
     const imports: PendingImport[] = [];
     for (const statement of sourceFile.statements) {
         if (ts.isImportDeclaration(statement)) {
@@ -405,11 +402,12 @@ const VALUE_KINDS: ReadonlySet<SourceImportKind> = new Set(['default', 'named', 
 export function analyzeScript(text: string, language: ScriptLanguage, options: ScriptOptions): SourceImport[] {
     const offset = options.offset ?? 0;
     const sourceFile = ts.createSourceFile(FILE_NAMES[language], text, ts.ScriptTarget.Latest, true, SCRIPT_KINDS[language]);
-    const checker = options.usage ? createChecker(sourceFile) : undefined;
-    const pending = collectImports(sourceFile, checker);
-    const usages = checker === undefined
-        ? undefined
-        : analyzeUsage(sourceFile, checker, pending.flatMap(item => item.bindings), options.templateIdentifiers);
+    let checker: ts.TypeChecker | undefined;
+    const lazyChecker = (): ts.TypeChecker => (checker ??= createChecker(sourceFile));
+    const pending = collectImports(sourceFile, lazyChecker);
+    const usages = options.usage
+        ? analyzeUsage(sourceFile, lazyChecker(), pending.flatMap(item => item.bindings), options.templateIdentifiers)
+        : undefined;
 
     return pending.map((item): SourceImport => {
         const bindings: BindingUsage[] = item.bindings.map((binding) => {

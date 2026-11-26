@@ -1,5 +1,5 @@
 import { isRelativeSpecifier, parseBareSpecifier } from '../packages';
-import { basename, dirname, joinPath, normalizePath, relativePath } from '../paths';
+import { basename, dirname, joinPath, normalizePath, relativePath, splitQuery } from '../paths';
 
 import type { BuildGraph } from '../graph/buildGraph';
 import type { ImportEdge } from '../schema/snapshot';
@@ -100,9 +100,12 @@ export function matchImport(
     const pathOf = (edge: ImportEdge): string | undefined => graph.module(edge.resolvedModule as string)?.path;
 
     if (isRelativeSpecifier(specifier) || specifier.startsWith('/')) {
-        const base = specifier.startsWith('/') ? specifier.slice(1) : joinPath(dirname(documentPath), specifier);
+        const { path: target, query } = splitQuery(specifier);
+        const base = target.startsWith('/') ? target.slice(1) : joinPath(dirname(documentPath), target);
         for (const candidate of candidatePaths(base)) {
-            const edge = preferKind(resolved.filter(each => pathOf(each) === candidate), hint);
+            const atPath = resolved.filter(each => pathOf(each) === candidate);
+            const withQuery = query === '' ? [] : atPath.filter(each => each.resolvedModule?.endsWith(query));
+            const edge = preferKind(withQuery.length > 0 ? withQuery : atPath, hint);
             if (edge) {
                 return { edge, confidence: 'resolved' };
             }

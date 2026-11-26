@@ -123,8 +123,8 @@ export class SnapshotBuilder {
         if (this.entryCandidates.size === 0) {
             return;
         }
-        const imported = new Set(this.imports.flatMap(edge => (edge.resolvedModule === undefined ? [] : [edge.resolvedModule])));
-        const roots = [...this.entryCandidates].filter(id => !imported.has(id));
+        const loadedLazily = new Set(this.imports.flatMap(edge => (edge.kind === 'dynamic' && edge.resolvedModule !== undefined ? [edge.resolvedModule] : [])));
+        const roots = [...this.entryCandidates].filter(id => !loadedLazily.has(id));
         for (const id of roots.length > 0 ? roots : this.entryCandidates) {
             this.markEntry(id);
         }

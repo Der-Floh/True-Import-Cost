@@ -140,6 +140,10 @@ function moduleId(path: string): string {
     return isVirtualPath(path) ? path : normalizePath(path);
 }
 
+function linkedOutputs(output: OutputRecord, outputs: ReadonlyMap<string, OutputRecord>, wanted: (record: ImportRecord) => boolean): string[] {
+    return output.imports.filter(record => !record.external && outputs.has(record.path) && wanted(record)).map(record => record.path);
+}
+
 export function isEsbuildMetafile(value: unknown): value is EsbuildMetafile {
     return isRecord(value) && isRecord(value.inputs) && isRecord(value.outputs) && value.format === undefined;
 }
@@ -227,10 +231,10 @@ export function normalizeEsbuildMetafile(metafile: unknown, context: BuildContex
             entry: isEntry,
             dynamicEntry: entryModule !== undefined && !isEntry,
             ...(entryModule === undefined ? {} : { entryModule }),
-            imports: output.imports.filter(record => !record.external && record.kind !== 'dynamic-import' && outputs.has(record.path)).map(record => record.path),
-            dynamicImports: output.imports.filter(record => !record.external && record.kind === 'dynamic-import' && outputs.has(record.path)).map(record => record.path),
+            imports: linkedOutputs(output, outputs, record => record.kind !== 'dynamic-import' && chunkKindOf(record.path) !== undefined),
+            dynamicImports: linkedOutputs(output, outputs, record => record.kind === 'dynamic-import'),
             css: output.cssBundle !== undefined && outputs.has(output.cssBundle) ? [output.cssBundle] : [],
-            assets: output.imports.filter(record => !record.external && record.kind === 'file-loader' && outputs.has(record.path)).map(record => record.path),
+            assets: linkedOutputs(output, outputs, record => record.kind !== 'dynamic-import' && chunkKindOf(record.path) === undefined),
         });
     }
 
