@@ -1,0 +1,328 @@
+{
+    "name": "true-import-cost",
+    "displayName": "True Import Cost",
+    "description": "Production-aware import costs: inline sizes measured from your own bundler's build output, not from isolated bundles",
+    "icon": "assets/icon-x512.png",
+    "publisher": "Florian-Noever",
+    "license": "MIT",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/Der-Floh/True-Import-Cost"
+    },
+    "bugs": {
+        "url": "https://github.com/Der-Floh/True-Import-Cost/issues"
+    },
+    "homepage": "https://github.com/Der-Floh/True-Import-Cost",
+    "qna": "https://github.com/Der-Floh/True-Import-Cost/issues",
+    "version": "0.1.0",
+    "engines": {
+        "vscode": "^1.100.0"
+    },
+    "categories": [
+        "Visualization",
+        "Linters",
+        "Other"
+    ],
+    "keywords": [
+        "import cost",
+        "bundle size",
+        "esbuild",
+        "vite",
+        "rollup",
+        "rolldown",
+        "vue",
+        "tree shaking",
+        "metafile",
+        "inlay hints"
+    ],
+    "capabilities": {
+        "untrustedWorkspaces": {
+            "supported": "limited",
+            "description": "In Restricted Mode the workspace's own trueImportCost.targets and trueImportCost.maxMetadataSizeMB are ignored; build metadata in .true-import-cost folders is still read, and nothing is ever executed.",
+            "restrictedConfigurations": [
+                "trueImportCost.targets",
+                "trueImportCost.maxMetadataSizeMB"
+            ]
+        },
+        "virtualWorkspaces": false
+    },
+    "activationEvents": [
+        "onLanguage:javascript",
+        "onLanguage:javascriptreact",
+        "onLanguage:typescript",
+        "onLanguage:typescriptreact",
+        "onLanguage:vue",
+        "workspaceContains:**/.true-import-cost/*.json"
+    ],
+    "main": "./out/extension.js",
+    "files": [
+        "LICENSE",
+        "README.md",
+        "CHANGELOG.md",
+        "assets/icon-x512.png",
+        "assets/activity-bar.svg",
+        "out/extension.js"
+    ],
+    "contributes": {
+        "commands": [
+            {
+                "command": "trueImportCost.selectTarget",
+                "title": "Select Build Target",
+                "category": "True Import Cost",
+                "icon": "$(target)"
+            },
+            {
+                "command": "trueImportCost.importMetadata",
+                "title": "Import Build Metadata",
+                "category": "True Import Cost",
+                "icon": "$(cloud-download)"
+            },
+            {
+                "command": "trueImportCost.refresh",
+                "title": "Refresh Analysis",
+                "category": "True Import Cost",
+                "icon": "$(refresh)"
+            },
+            {
+                "command": "trueImportCost.explainWhyIncluded",
+                "title": "Explain Why Included",
+                "category": "True Import Cost",
+                "icon": "$(question)"
+            },
+            {
+                "command": "trueImportCost.toggleInlayHints",
+                "title": "Toggle Inline Hints",
+                "category": "True Import Cost"
+            },
+            {
+                "command": "trueImportCost.clearCache",
+                "title": "Clear Cache",
+                "category": "True Import Cost"
+            },
+            {
+                "command": "trueImportCost.showLog",
+                "title": "Show Log",
+                "category": "True Import Cost"
+            }
+        ],
+        "menus": {
+            "commandPalette": [
+                {
+                    "command": "trueImportCost.explainWhyIncluded",
+                    "when": "editorLangId =~ /^(javascript|javascriptreact|typescript|typescriptreact|vue)$/"
+                }
+            ],
+            "view/title": [
+                {
+                    "command": "trueImportCost.selectTarget",
+                    "when": "view == trueImportCost.packages",
+                    "group": "navigation@1"
+                },
+                {
+                    "command": "trueImportCost.refresh",
+                    "when": "view == trueImportCost.packages",
+                    "group": "navigation@2"
+                },
+                {
+                    "command": "trueImportCost.importMetadata",
+                    "when": "view == trueImportCost.packages",
+                    "group": "navigation@3"
+                }
+            ],
+            "view/item/context": [
+                {
+                    "command": "trueImportCost.explainWhyIncluded",
+                    "when": "view == trueImportCost.packages && viewItem =~ /^(package|module)$/",
+                    "group": "inline"
+                }
+            ]
+        },
+        "viewsContainers": {
+            "activitybar": [
+                {
+                    "id": "trueImportCost",
+                    "title": "True Import Cost",
+                    "icon": "assets/activity-bar.svg"
+                }
+            ]
+        },
+        "views": {
+            "trueImportCost": [
+                {
+                    "id": "trueImportCost.packages",
+                    "name": "Bundle Contents"
+                },
+                {
+                    "id": "trueImportCost.whyIncluded",
+                    "name": "Why Included"
+                }
+            ]
+        },
+        "viewsWelcome": [
+            {
+                "view": "trueImportCost.packages",
+                "contents": "No build metadata found yet.\n\nTrue Import Cost reads what your own production build reports. Write an esbuild metafile into a `.true-import-cost` folder, or add the `@true-import-cost/vite` or `@true-import-cost/esbuild` plugin to your build.\n\n[Import Build Metadata](command:trueImportCost.importMetadata)\n\n[Read the setup guide](https://github.com/Der-Floh/True-Import-Cost#-usage)"
+            },
+            {
+                "view": "trueImportCost.whyIncluded",
+                "contents": "Run Explain Why Included on an import, a package or a module to see the import chains that pull it into the build."
+            }
+        ],
+        "configuration": {
+            "title": "True Import Cost",
+            "properties": {
+                "trueImportCost.enabled": {
+                    "type": "boolean",
+                    "default": true,
+                    "markdownDescription": "Show import costs. When off, nothing is read and no hint, hover or diagnostic is shown.",
+                    "scope": "window"
+                },
+                "trueImportCost.inlayHints.enabled": {
+                    "type": "boolean",
+                    "default": true,
+                    "markdownDescription": "Show the cost of each import inline, at the end of the import. Hovers, diagnostics and the views stay available when this is off.",
+                    "scope": "window"
+                },
+                "trueImportCost.targets": {
+                    "type": "array",
+                    "default": [],
+                    "markdownDescription": "Build metadata files to read in addition to the ones found automatically. Each entry names a build target and points at an esbuild metafile or a True Import Cost snapshot, relative to the workspace folder.",
+                    "scope": "resource",
+                    "items": {
+                        "type": "object",
+                        "required": [
+                            "metadata"
+                        ],
+                        "additionalProperties": false,
+                        "properties": {
+                            "id": {
+                                "type": "string",
+                                "markdownDescription": "Name of the build target, such as `extension-host` or `webview`. Defaults to the snapshot's own target, then to the file name."
+                            },
+                            "metadata": {
+                                "type": "string",
+                                "markdownDescription": "Path of the metadata file, relative to the workspace folder."
+                            },
+                            "root": {
+                                "type": "string",
+                                "markdownDescription": "Directory the bundler ran in, relative to the workspace folder. Only needed for a raw esbuild metafile when it cannot be worked out from the paths the metafile contains."
+                            }
+                        }
+                    }
+                },
+                "trueImportCost.autoDiscover": {
+                    "type": "boolean",
+                    "default": true,
+                    "markdownDescription": "Read every `*.json` file in a `.true-import-cost` folder of the workspace as build metadata.",
+                    "scope": "resource"
+                },
+                "trueImportCost.display.exclusive": {
+                    "type": "boolean",
+                    "default": true,
+                    "markdownDescription": "Add how much of an import's cost is exclusive to it, or that it is entirely shared with other imports.",
+                    "scope": "window"
+                },
+                "trueImportCost.display.external": {
+                    "type": "boolean",
+                    "default": true,
+                    "markdownDescription": "Show a hint on imports the build leaves external, such as `vscode` in an extension host.",
+                    "scope": "window"
+                },
+                "trueImportCost.display.typeOnly": {
+                    "type": "boolean",
+                    "default": false,
+                    "markdownDescription": "Show a hint on type-only imports, which compilation erases.",
+                    "scope": "window"
+                },
+                "trueImportCost.display.unresolved": {
+                    "type": "boolean",
+                    "default": true,
+                    "markdownDescription": "Show a hint on imports the build metadata has no record of, such as an import added after the last build.",
+                    "scope": "window"
+                },
+                "trueImportCost.analysis.usageAnalysis": {
+                    "type": "boolean",
+                    "default": true,
+                    "markdownDescription": "Work out how each imported binding is used — members accessed, calls, values that escape — and show it in the hover.",
+                    "scope": "window"
+                },
+                "trueImportCost.analysis.debounceMs": {
+                    "type": "number",
+                    "default": 300,
+                    "minimum": 0,
+                    "maximum": 5000,
+                    "markdownDescription": "How long a document has to stay unchanged before its imports are analysed again.",
+                    "scope": "window"
+                },
+                "trueImportCost.diagnostics.duplicatePackages": {
+                    "type": "boolean",
+                    "default": true,
+                    "markdownDescription": "Add an information diagnostic to an import whose package is bundled more than once, in different versions or from different install locations.",
+                    "scope": "window"
+                },
+                "trueImportCost.maxMetadataSizeMB": {
+                    "type": "number",
+                    "default": 64,
+                    "minimum": 1,
+                    "maximum": 1024,
+                    "markdownDescription": "Largest metadata file that is read, in megabytes. Larger files are rejected rather than parsed.",
+                    "scope": "resource"
+                }
+            }
+        }
+    },
+    "scripts": {
+        "vscode:prepublish": "run-s check-types lint bundle:production",
+        "compile": "run-s check-types lint bundle bundle:packages",
+        "bundle": "node esbuild.mjs",
+        "bundle:production": "node esbuild.mjs --production",
+        "bundle:packages": "node scripts/buildPackages.mjs",
+        "compile-tests": "node esbuild.mjs --tests",
+        "watch": "npm-run-all -p watch:*",
+        "watch:esbuild": "node esbuild.mjs --watch",
+        "watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
+        "check-types": "tsc --noEmit && tsc --noEmit -p src/plugins/tsconfig.json && tsc --noEmit -p src/test/tsconfig.json && tsc --noEmit -p src/test/integration/tsconfig.json",
+        "lint": "eslint src --max-warnings 0",
+        "pretest": "run-s bundle bundle:packages",
+        "test": "vitest run",
+        "test:core": "vitest run --project core",
+        "test:host": "vitest run --project host",
+        "test:builds": "vitest run --project builds",
+        "test:repo": "vitest run --project repo",
+        "ci:check": "run-s compile test",
+        "test:integration": "run-s bundle compile-tests test:integration:desktop",
+        "test:integration:desktop": "node ./out/test/runIntegration.js",
+        "package": "vsce package --no-dependencies"
+    },
+    "dependencies": {
+        "@vue/compiler-dom": "^3.5.46",
+        "typescript": "~6.0.3",
+        "zod": "^4.6.7"
+    },
+    "devDependencies": {
+        "@stylistic/eslint-plugin": "^5.10.0",
+        "@types/mocha": "^10.0.10",
+        "@types/node": "^22.20.7",
+        "@types/vscode": "~1.100.0",
+        "@vitejs/plugin-vue": "^6.0.11",
+        "@vscode/test-electron": "^3.1.0",
+        "@vscode/vsce": "^4.1.1",
+        "esbuild": "^0.28.2",
+        "eslint": "^10.15.0",
+        "eslint-plugin-import-x": "^4.18.1",
+        "mocha": "^12.0.3",
+        "npm-run-all2": "^9.1.0",
+        "typescript-eslint": "^8.74.0",
+        "vite": "^8.3.8",
+        "vitest": "^5.1.2",
+        "vue": "^3.5.46"
+    },
+    "overrides": {
+        "glob": "^14.0.2",
+        "minimatch": "^11.0.1"
+    },
+    "allowScripts": {
+        "@vscode/vsce-sign": false,
+        "esbuild": true
+    }
+}
