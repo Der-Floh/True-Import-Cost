@@ -5,12 +5,15 @@ import { fileURLToPath } from 'node:url';
 import * as esbuild from 'esbuild';
 import ts from 'typescript';
 
+import { bundleDeclarations } from './bundleDeclarations.mjs';
+
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 const PACKAGES = [
     { directory: 'packages/esbuild', entry: 'src/plugins/esbuild.ts', peers: ['esbuild'] },
     { directory: 'packages/vite', entry: 'src/plugins/vite.ts', peers: ['vite'] },
     { directory: 'packages/webpack', entry: 'src/plugins/webpack.ts', peers: ['webpack', '@rspack/core'], files: ['src/plugins/webpackLoader.cjs'] },
+    { directory: 'packages/snapshot', entry: 'src/plugins/snapshot.ts', peers: [] },
 ];
 
 const COMMONJS_IMPORT_META = {
@@ -46,16 +49,16 @@ function declarationOf(entry, compilerOptions) {
         }));
     }
     const wanted = path.join(ROOT, 'out', 'declarations', entry.replace(/\.ts$/, '.d.ts'));
-    let text;
+    const emitted = new Map();
     program.emit(undefined, (fileName, content) => {
-        if (path.resolve(fileName) === wanted) {
-            text = content;
-        }
+        emitted.set(path.resolve(fileName), content);
     }, undefined, true);
-    if (text === undefined) {
+    const own = emitted.get(wanted);
+    if (own === undefined) {
         throw new Error(`No declaration was emitted for ${entry}.`);
     }
-    if (/from ['"]\.\.?\//.test(text)) {
+    const text = /from ['"]\.\.?\//.test(own) ? bundleDeclarations(emitted, wanted, compilerOptions) : own;
+    if (/from ['"]\.\.?\/|import\(['"]\.\.?\//.test(text)) {
         throw new Error(`The declaration of ${entry} refers to project files, so it would not resolve once published:\n${text}`);
     }
     return text;

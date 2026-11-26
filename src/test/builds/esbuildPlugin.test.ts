@@ -4,12 +4,9 @@ import path from 'node:path';
 import * as esbuild from 'esbuild';
 import { afterAll, describe, expect, it } from 'vitest';
 
-import { ESBUILD_FIXTURE } from './support';
-import { parseSnapshot } from '../../core/schema/validate';
+import { ESBUILD_FIXTURE, readSnapshot } from './support';
 import { trueImportCost } from '../../plugins/esbuild';
 import { sanitizeTarget, snapshotRoot } from '../../plugins/shared';
-
-import type { BuildSnapshot } from '../../core/schema/snapshot';
 
 const directories: string[] = [];
 
@@ -17,14 +14,6 @@ function temporaryDirectory(): string {
     const directory = mkdtempSync(path.join(tmpdir(), 'true-import-cost-esbuild-'));
     directories.push(directory);
     return directory;
-}
-
-function readSnapshot(file: string): BuildSnapshot {
-    const result = parseSnapshot(JSON.parse(readFileSync(file, 'utf8')));
-    if (!result.ok) {
-        throw new Error(result.error);
-    }
-    return result.snapshot;
 }
 
 function buildWith(plugin: esbuild.Plugin, options: esbuild.BuildOptions = {}): Promise<esbuild.BuildResult> {

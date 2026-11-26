@@ -65,7 +65,7 @@ const importSchema = z.object({
     retained: z.optional(z.boolean()),
 });
 
-const snapshotSchema: z.ZodMiniType<BuildSnapshot> = z.object({
+export const snapshotSchema: z.ZodMiniType<BuildSnapshot> = z.object({
     format: z.literal(SNAPSHOT_FORMAT),
     schemaVersion: z.literal(SNAPSHOT_SCHEMA_VERSION),
     id: text,
@@ -143,8 +143,22 @@ function findIntegrityError(snapshot: BuildSnapshot): string | undefined {
         if (chunk.entryModule !== undefined && !modules.has(chunk.entryModule)) {
             return `chunk "${chunk.id}" names unknown entry module "${chunk.entryModule}"`;
         }
+        const unknownOutput = [chunk.imports, chunk.dynamicImports, chunk.css, chunk.assets].flat().find(id => !outputs.has(id));
+        if (unknownOutput !== undefined) {
+            return `chunk "${chunk.id}" loads unknown output "${unknownOutput}"`;
+        }
     }
     return undefined;
+}
+
+function versionError(version: unknown): string {
+    if (typeof version === 'number' && Number.isInteger(version) && version > SNAPSHOT_SCHEMA_VERSION) {
+        return `the snapshot was written by a newer True Import Cost (schema version ${version}); update the extension or the CLI to read it`;
+    }
+    if (typeof version === 'number' || typeof version === 'string') {
+        return `the snapshot's schema version is ${typeof version === 'string' ? JSON.stringify(version) : version}, not ${SNAPSHOT_SCHEMA_VERSION}`;
+    }
+    return version === undefined ? 'the snapshot has no schema version' : 'the snapshot\'s schema version is not a number';
 }
 
 export function parseSnapshot(value: unknown): SnapshotParseResult {
@@ -152,10 +166,10 @@ export function parseSnapshot(value: unknown): SnapshotParseResult {
         return fail('the metadata is not a JSON object');
     }
     if (value.format !== SNAPSHOT_FORMAT) {
-        return fail(`the metadata is not a ${SNAPSHOT_FORMAT}`);
+        return fail(`the metadata is not a True Import Cost build snapshot: its format is not "${SNAPSHOT_FORMAT}"`);
     }
     if (value.schemaVersion !== SNAPSHOT_SCHEMA_VERSION) {
-        return fail(`schema version ${String(value.schemaVersion)} is not supported; this version of True Import Cost reads version ${SNAPSHOT_SCHEMA_VERSION}`);
+        return fail(versionError(value.schemaVersion));
     }
 
     const result = snapshotSchema.safeParse(value);

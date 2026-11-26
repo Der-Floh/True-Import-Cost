@@ -9,6 +9,7 @@ Vite build ─────► @true-import-cost/vite ─────► snapshot
 webpack build ──► stats JSON ─────────────────────────────┤
 webpack build ──► @true-import-cost/webpack ──► snapshot ─┤
 Rspack build ───► @true-import-cost/webpack ──► snapshot ─┤
+other bundler ──► @true-import-cost/snapshot ─► snapshot ─┤
                                                            ▼
                                metadata store (find, validate, watch)
                                                            ▼
@@ -35,8 +36,8 @@ ESLint enforces the boundaries (`eslint.config.mjs`), and the `core` Vitest proj
 
 ## Core
 
-- **Schema** (`schema/snapshot.ts`, `schema/validate.ts`) — the `BuildSnapshot` format described in [snapshot-schema.md](snapshot-schema.md), validated with `zod/mini` plus consistency checks between modules, imports and outputs.
-- **Adapters** (`adapters/`) — the `BundlerAdapter` interface (`supports`, `normalize`), the esbuild metafile adapter, the Rollup/Rolldown adapter the Vite plugin uses, the webpack and Rspack stats adapter, which the webpack plugin uses too, and a pass-through for snapshots. `normalizeMetadata` picks the adapter that recognises the input and validates whatever it produces. A new bundler is a new adapter; nothing else changes.
+- **Schema** (`schema/snapshot.ts`, `schema/validate.ts`) — the `BuildSnapshot` format described in [snapshot-schema.md](snapshot-schema.md), validated with `zod/mini` plus consistency checks between modules, imports and outputs. `schema/jsonSchema.ts` converts the zod schema into the JSON Schema that `@true-import-cost/snapshot` publishes; a test keeps the committed `packages/snapshot/build-snapshot.schema.json` equal to it, and `vitest run --project core --update` rewrites the file after a change.
+- **Adapters** (`adapters/`) — the `BundlerAdapter` interface (`supports`, `normalize`), the esbuild metafile adapter, the Rollup/Rolldown adapter the Vite plugin uses, the webpack and Rspack stats adapter, which the webpack plugin uses too, and a pass-through for snapshots. `normalizeMetadata` picks the adapter that recognises the input and validates whatever it produces. A new bundler is a new adapter; nothing else changes. Any other bundler takes part by writing snapshots, with a plugin built on `@true-import-cost/snapshot` (`src/plugins/snapshot.ts`): see [writing-a-plugin.md](writing-a-plugin.md).
 - **Graph** (`graph/`) — `BuildGraph` indexes modules by id and by path, imports in both directions, package instances by install root (two installed versions are two instances), retained bytes and the precision of each module. On top of it: reachability, the impact of one import edge (bundled, lazy, exclusive and shared bytes), why-included chains and duplicate packages. Every traversal keeps a visited set, so cycles terminate. Import costs walk a compact index of the graph (`graph/graphIndex.ts`), and exclusive bytes come from a dominator tree that is built once per build (`graph/exclusion.ts`): removing the imports of one document stops exactly the modules that every path from the entry points reaches through those imports.
 - **Attribution** (`attribution/`) — matches an import of the document to an import edge of the build, traces a named import of a barrel to the modules that define what it uses (`barrels.ts`), and turns the result into an `ImportCost`.
 

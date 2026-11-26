@@ -33,6 +33,8 @@ Build metadata is untrusted input:
 
 The plugins run inside your build. They have no runtime dependencies, make no network requests, and write only the snapshot file (atomically) and a `.gitignore` in a `.true-import-cost` folder they create.
 
+`@true-import-cost/snapshot`, which the plugins are built on and which plugins for other bundlers use, has no dependencies either, makes no network requests, and writes only the snapshot, a `.gitignore` in a `.true-import-cost` folder it creates and, while measuring, the edit report. Snapshots from third-party plugins are untrusted metadata like any other: the extension never runs their code and validates their files the same way.
+
 In measurement mode, which only the `TRUE_IMPORT_COST_MEASURE` environment variable turns on, a plugin reads the request file the variable names. It refuses a request it cannot validate. It applies the edits the request lists to the source in memory, but only where the text still matches what the request expects. It keeps the build from writing its output, stopping the build rather than writing if another plugin turns writing back on. It writes its snapshot and an edit report to the folder the request names, instead of `.true-import-cost`.
 
 ## The CLI

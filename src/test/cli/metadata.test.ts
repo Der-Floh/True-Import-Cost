@@ -85,7 +85,7 @@ describe('loading the metadata of a build', () => {
         ['folder', { 'folder/meta.json': METAFILE }, 'folder: not a file'],
         ['meta.json', { 'meta.json': '{ "inputs": ' }, 'meta.json: the file is not valid JSON: '],
         ['meta.json', { 'meta.json': '{ "chunks": [] }' }, 'meta.json: the file is neither a True Import Cost snapshot nor build metadata of a supported bundler'],
-        ['meta.json', { 'meta.json': JSON.stringify({ ...SNAPSHOT, schemaVersion: 2 }) }, 'meta.json: schema version 2 is not supported'],
+        ['meta.json', { 'meta.json': JSON.stringify({ ...SNAPSHOT, schemaVersion: 2 }) }, 'meta.json: the snapshot was written by a newer True Import Cost (schema version 2); update the extension or the CLI to read it'],
     ])('rejects %s with %j', async (file, files: MemoryFiles, message) => {
         await expect(load(file, files)).rejects.toThrow(message);
     });

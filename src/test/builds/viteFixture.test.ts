@@ -1,12 +1,11 @@
-import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import vue from '@vitejs/plugin-vue';
 import { build } from 'vite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { attributeFile, graphOf, only, VITE_FIXTURE } from './support';
-import { parseSnapshot } from '../../core/schema/validate';
+import { attributeFile, graphOf, only, readSnapshot, VITE_FIXTURE } from './support';
 import { trueImportCost } from '../../plugins/vite';
 
 import type { AttributedImport } from './support';
@@ -30,14 +29,6 @@ async function buildFixture(outDir: string, overrides: InlineConfig['build'] = {
         plugins: [vue(), trueImportCost({ target, outDir })],
         build: { write: false, ...overrides },
     });
-}
-
-function readSnapshot(file: string): BuildSnapshot {
-    const result = parseSnapshot(JSON.parse(readFileSync(file, 'utf8')));
-    if (!result.ok) {
-        throw new Error(result.error);
-    }
-    return result.snapshot;
 }
 
 let outDir: string;

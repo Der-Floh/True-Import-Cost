@@ -3,9 +3,8 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterAll, afterEach, describe, expect, it } from 'vitest';
 
-import { ESBUILD_FIXTURE } from './support';
+import { ESBUILD_FIXTURE, readSnapshot } from './support';
 import { BUNDLERS, buildFixture, WEBPACK_FIXTURE } from './webpackSupport';
-import { parseSnapshot } from '../../core/schema/validate';
 import { MEASURE_ENV, MEASURE_VERSION, measureReportFile } from '../../plugins/measure';
 import { TrueImportCostPlugin } from '../../plugins/webpack';
 
@@ -34,14 +33,6 @@ function replacing(file: string, statement: string, replacement: string): Source
     const start = readFileSync(file, 'utf8').indexOf(statement);
     expect(start, `${statement} in ${file}`).toBeGreaterThanOrEqual(0);
     return { file, start, end: start + statement.length, expected: statement, replacement };
-}
-
-function readSnapshot(file: string): BuildSnapshot {
-    const result = parseSnapshot(JSON.parse(readFileSync(file, 'utf8')));
-    if (!result.ok) {
-        throw new Error(result.error);
-    }
-    return result.snapshot;
 }
 
 function readReport(snapshotFile: string): MeasureReport {

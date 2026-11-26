@@ -245,7 +245,8 @@ describe('rejecting metadata', () => {
     it('says what is wrong with a snapshot that fails validation', async () => {
         writeJson('/w/.true-import-cost/web.json', { ...buildSnapshot({ target: 'web', modules: [] }), schemaVersion: 2 });
 
-        expect(failure(await loadTarget(source('/w/.true-import-cost/web.json')))).toMatch(/^schema version 2 is not supported/);
+        expect(failure(await loadTarget(source('/w/.true-import-cost/web.json'))))
+            .toBe('the snapshot was written by a newer True Import Cost (schema version 2); update the extension or the CLI to read it');
     });
 
     it('says what is wrong with a malformed metafile', async () => {

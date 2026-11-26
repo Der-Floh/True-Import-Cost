@@ -88,6 +88,8 @@ module.exports = {
 
 Raw stats work too: `webpack --json=.true-import-cost/extension-host.json`, or `stats.toJson({ all: true })` written to that folder for Rspack.
 
+**Any other bundler** — a plugin built on [`@true-import-cost/snapshot`](packages/snapshot/README.md) writes the same snapshot. [Writing a plugin for another bundler](docs/writing-a-plugin.md) walks through one. The format is stable within schema version 1, and [a JSON Schema](packages/snapshot/build-snapshot.schema.json) describes it for tools in other languages.
+
 A metafile or stats file that already lives somewhere else can be added with **Import Build Metadata**, or listed in `trueImportCost.targets`.
 
 ### 2. Open a source file
@@ -299,10 +301,10 @@ Bug reports and feature requests are welcome via [Issues](https://github.com/Der
 | Parser | `src/parser` | Import extraction and symbol-based usage analysis with the TypeScript compiler API, and Vue single-file components through `@vue/compiler-dom`. Bundled separately and loaded on first use, so activation does not pay for TypeScript |
 | Extension | `src/extension` | Finding, reading and watching metadata, build targets, inlay hints, hovers, diagnostics, views, commands, baselines and history |
 | Dashboard | `src/webview`, `src/shared` | Vue 3 webview built with Vite into one script, talking to the host only through the message contract in `src/shared` |
-| Bundler plugins | `src/plugins`, published from `packages/` | `@true-import-cost/esbuild`, `@true-import-cost/vite` and `@true-import-cost/webpack`, built from the same core sources |
+| Bundler plugins | `src/plugins`, published from `packages/` | `@true-import-cost/esbuild`, `@true-import-cost/vite` and `@true-import-cost/webpack`, built from the same core sources, and `@true-import-cost/snapshot`, which they and plugins for other bundlers build on |
 | CLI | `src/cli`, published from `packages/cli` | `true-import-cost summary`, `compare` and `check` for CI pipelines, on the same core |
 
-[docs/architecture.md](docs/architecture.md) explains the data flow, [docs/snapshot-schema.md](docs/snapshot-schema.md) the metadata format and [docs/roadmap.md](docs/roadmap.md) what comes next.
+[docs/architecture.md](docs/architecture.md) explains the data flow, [docs/snapshot-schema.md](docs/snapshot-schema.md) the metadata format, [docs/writing-a-plugin.md](docs/writing-a-plugin.md) how to write a plugin for another bundler and [docs/roadmap.md](docs/roadmap.md) the milestones up to 1.0.
 
 ### Build commands
 

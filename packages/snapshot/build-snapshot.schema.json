@@ -1,0 +1,310 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://raw.githubusercontent.com/Der-Floh/True-Import-Cost/main/packages/snapshot/build-snapshot.schema.json",
+    "title": "True Import Cost build snapshot",
+    "description": "The modules, chunks, assets and imports of one build target, as docs/snapshot-schema.md describes them. This schema checks the shape and the limits of a snapshot. parseSnapshot in @true-import-cost/snapshot also checks that ids are unique, and that every module and output an import, a contribution or a chunk names exists.",
+    "type": "object",
+    "properties": {
+        "format": {
+            "type": "string",
+            "const": "true-import-cost/build-snapshot"
+        },
+        "schemaVersion": {
+            "type": "number",
+            "const": 1
+        },
+        "id": {
+            "type": "string",
+            "maxLength": 4096
+        },
+        "target": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+        },
+        "createdAt": {
+            "type": "number",
+            "minimum": 0
+        },
+        "bundler": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256
+                },
+                "version": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256
+                },
+                "engine": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256
+                }
+            },
+            "required": [
+                "name"
+            ]
+        },
+        "mode": {
+            "type": "string",
+            "enum": [
+                "production",
+                "development"
+            ]
+        },
+        "root": {
+            "type": "string",
+            "maxLength": 4096
+        },
+        "modules": {
+            "maxItems": 500000,
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "maxLength": 4096
+                    },
+                    "path": {
+                        "type": "string",
+                        "maxLength": 4096
+                    },
+                    "virtual": {
+                        "type": "boolean"
+                    },
+                    "entry": {
+                        "type": "boolean"
+                    },
+                    "packageName": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 256
+                    },
+                    "packageVersion": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 256
+                    },
+                    "packageRoot": {
+                        "type": "string",
+                        "maxLength": 4096
+                    },
+                    "sourceBytes": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                    },
+                    "contributions": {
+                        "maxItems": 10000,
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "chunkId": {
+                                    "type": "string",
+                                    "maxLength": 4096
+                                },
+                                "bytes": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 9007199254740991
+                                },
+                                "precision": {
+                                    "type": "string",
+                                    "enum": [
+                                        "bundler-reported",
+                                        "sourcemap-estimate",
+                                        "rendered-length",
+                                        "proportional-estimate"
+                                    ]
+                                }
+                            },
+                            "required": [
+                                "chunkId",
+                                "bytes",
+                                "precision"
+                            ]
+                        }
+                    }
+                },
+                "required": [
+                    "id",
+                    "path",
+                    "contributions"
+                ]
+            }
+        },
+        "chunks": {
+            "maxItems": 50000,
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "maxLength": 4096
+                    },
+                    "kind": {
+                        "type": "string",
+                        "enum": [
+                            "js",
+                            "css"
+                        ]
+                    },
+                    "bytes": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                    },
+                    "entry": {
+                        "type": "boolean"
+                    },
+                    "dynamicEntry": {
+                        "type": "boolean"
+                    },
+                    "entryModule": {
+                        "type": "string",
+                        "maxLength": 4096
+                    },
+                    "imports": {
+                        "maxItems": 50000,
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "maxLength": 4096
+                        }
+                    },
+                    "dynamicImports": {
+                        "maxItems": 50000,
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "maxLength": 4096
+                        }
+                    },
+                    "css": {
+                        "maxItems": 50000,
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "maxLength": 4096
+                        }
+                    },
+                    "assets": {
+                        "maxItems": 50000,
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "maxLength": 4096
+                        }
+                    }
+                },
+                "required": [
+                    "id",
+                    "kind",
+                    "bytes",
+                    "entry",
+                    "dynamicEntry",
+                    "imports",
+                    "dynamicImports",
+                    "css",
+                    "assets"
+                ]
+            }
+        },
+        "assets": {
+            "maxItems": 200000,
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "maxLength": 4096
+                    },
+                    "kind": {
+                        "type": "string",
+                        "enum": [
+                            "image",
+                            "font",
+                            "wasm",
+                            "html",
+                            "sourcemap",
+                            "other"
+                        ]
+                    },
+                    "bytes": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                    }
+                },
+                "required": [
+                    "id",
+                    "kind",
+                    "bytes"
+                ]
+            }
+        },
+        "imports": {
+            "maxItems": 2000000,
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "importer": {
+                        "type": "string",
+                        "maxLength": 4096
+                    },
+                    "specifier": {
+                        "type": "string",
+                        "maxLength": 4096
+                    },
+                    "resolvedModule": {
+                        "type": "string",
+                        "maxLength": 4096
+                    },
+                    "kind": {
+                        "type": "string",
+                        "enum": [
+                            "static",
+                            "dynamic",
+                            "require",
+                            "css",
+                            "reference"
+                        ]
+                    },
+                    "external": {
+                        "type": "boolean"
+                    },
+                    "retained": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "importer",
+                    "kind",
+                    "external"
+                ]
+            }
+        }
+    },
+    "required": [
+        "format",
+        "schemaVersion",
+        "id",
+        "target",
+        "createdAt",
+        "bundler",
+        "root",
+        "modules",
+        "chunks",
+        "assets",
+        "imports"
+    ]
+}

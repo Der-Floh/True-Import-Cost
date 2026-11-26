@@ -1,0 +1,54 @@
+{
+    "name": "@true-import-cost/snapshot",
+    "version": "0.1.0",
+    "description": "Build, check and write True Import Cost build snapshots from a plugin for any bundler, so the True Import Cost VS Code extension and CLI can read its builds",
+    "license": "MIT",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/Der-Floh/True-Import-Cost.git",
+        "directory": "packages/snapshot"
+    },
+    "homepage": "https://github.com/Der-Floh/True-Import-Cost/tree/main/packages/snapshot#readme",
+    "bugs": {
+        "url": "https://github.com/Der-Floh/True-Import-Cost/issues"
+    },
+    "keywords": [
+        "bundle size",
+        "import cost",
+        "bundler",
+        "bundler-plugin",
+        "build snapshot",
+        "json schema",
+        "true-import-cost"
+    ],
+    "main": "./dist/index.cjs",
+    "module": "./dist/index.mjs",
+    "types": "./dist/index.d.cts",
+    "exports": {
+        ".": {
+            "import": {
+                "types": "./dist/index.d.mts",
+                "default": "./dist/index.mjs"
+            },
+            "require": {
+                "types": "./dist/index.d.cts",
+                "default": "./dist/index.cjs"
+            }
+        },
+        "./build-snapshot.schema.json": "./build-snapshot.schema.json",
+        "./package.json": "./package.json"
+    },
+    "files": [
+        "dist",
+        "build-snapshot.schema.json",
+        "README.md",
+        "LICENSE"
+    ],
+    "sideEffects": false,
+    "engines": {
+        "node": ">=18"
+    },
+    "publishConfig": {
+        "access": "public"
+    }
+}

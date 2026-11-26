@@ -40,7 +40,7 @@ describe('normalizeMetadata', () => {
     it('reports why a snapshot is invalid', async () => {
         expect(await normalizeMetadata({ ...SNAPSHOT, schemaVersion: 7 }, BUILD_CONTEXT)).toEqual({
             ok: false,
-            error: 'schema version 7 is not supported; this version of True Import Cost reads version 1',
+            error: 'the snapshot was written by a newer True Import Cost (schema version 7); update the extension or the CLI to read it',
         });
         expect(await normalizeMetadata({ ...SNAPSHOT, imports: [{ importer: 'src/gone.ts', kind: 'static', external: true }] }, BUILD_CONTEXT))
             .toEqual({ ok: false, error: 'an import names unknown importer "src/gone.ts"' });
@@ -49,7 +49,7 @@ describe('normalizeMetadata', () => {
     it('routes anything with the snapshot format marker to the snapshot adapter, even if it looks like a metafile', async () => {
         const result = await normalizeMetadata({ format: SNAPSHOT_FORMAT, inputs: {}, outputs: {} }, BUILD_CONTEXT);
 
-        expect(result).toEqual({ ok: false, error: 'schema version undefined is not supported; this version of True Import Cost reads version 1' });
+        expect(result).toEqual({ ok: false, error: 'the snapshot has no schema version' });
     });
 
     it('normalises and validates an esbuild metafile', async () => {

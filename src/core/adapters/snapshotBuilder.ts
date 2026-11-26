@@ -5,6 +5,7 @@ import type { BuildContext } from './adapter';
 import type {
     AssetRecord,
     BuildSnapshot,
+    ChunkKind,
     ChunkRecord,
     ImportEdge,
     MeasurementPrecision,
@@ -29,13 +30,18 @@ export interface ModuleOptions {
     readonly sourceBytes?: number;
 }
 
+export interface ChunkInput extends Partial<ChunkRecord> {
+    readonly id: string;
+    readonly kind: ChunkKind;
+    readonly bytes: number;
+}
+
 export class SnapshotBuilder {
     private readonly modules = new Map<string, ModuleDraft>();
     private readonly chunks = new Map<string, ChunkRecord>();
     private readonly assets = new Map<string, AssetRecord>();
     private readonly imports: ImportEdge[] = [];
     private readonly edgeKeys = new Set<string>();
-    private readonly entryCandidates = new Set<string>();
 
     public hasModule(id: string): boolean {
         return this.modules.has(id);
@@ -70,14 +76,21 @@ export class SnapshotBuilder {
         this.modules.set(id, draft);
     }
 
-    public contribute(moduleId: string, chunkId: string, bytes: number, precision: MeasurementPrecision): void {
+    public markEntry(moduleId: string): void {
+        const draft = this.modules.get(moduleId);
+        if (draft) {
+            draft.entry = true;
+        }
+    }
+
+    public contribute(moduleId: string, outputId: string, bytes: number, precision: MeasurementPrecision): void {
         const draft = this.modules.get(moduleId);
         if (!draft || bytes <= 0) {
             return;
         }
-        const previous = draft.contributions.get(chunkId);
-        draft.contributions.set(chunkId, {
-            chunkId,
+        const previous = draft.contributions.get(outputId);
+        draft.contributions.set(outputId, {
+            chunkId: outputId,
             bytes: Math.round((previous?.bytes ?? 0) + bytes),
             precision: previous && PRECISION_RANK[previous.precision] > PRECISION_RANK[precision] ? previous.precision : precision,
         });
@@ -92,46 +105,30 @@ export class SnapshotBuilder {
         this.imports.push(edge);
     }
 
-    public chunk(chunk: ChunkRecord): void {
-        this.chunks.set(chunk.id, chunk);
-    }
-
-    public hasOutput(id: string): boolean {
-        return this.chunks.has(id) || this.assets.has(id);
+    public chunk(chunk: ChunkInput): void {
+        this.chunks.set(chunk.id, {
+            id: chunk.id,
+            kind: chunk.kind,
+            bytes: chunk.bytes,
+            entry: chunk.entry ?? false,
+            dynamicEntry: chunk.dynamicEntry ?? false,
+            ...(chunk.entryModule === undefined ? {} : { entryModule: chunk.entryModule }),
+            imports: chunk.imports ?? [],
+            dynamicImports: chunk.dynamicImports ?? [],
+            css: chunk.css ?? [],
+            assets: chunk.assets ?? [],
+        });
     }
 
     public asset(asset: AssetRecord): void {
         this.assets.set(asset.id, asset);
     }
 
-    public markEntry(moduleId: string): void {
-        const draft = this.modules.get(moduleId);
-        if (draft) {
-            draft.entry = true;
-        }
-    }
-
-    public markEntryCandidate(moduleId: string): void {
-        this.entryCandidates.add(moduleId);
-    }
-
-    public isEntry(moduleId: string): boolean {
-        return this.modules.get(moduleId)?.entry ?? false;
-    }
-
-    public resolveEntryCandidates(): void {
-        if (this.entryCandidates.size === 0) {
-            return;
-        }
-        const loadedLazily = new Set(this.imports.flatMap(edge => (edge.kind === 'dynamic' && edge.resolvedModule !== undefined ? [edge.resolvedModule] : [])));
-        const roots = [...this.entryCandidates].filter(id => !loadedLazily.has(id));
-        for (const id of roots.length > 0 ? roots : this.entryCandidates) {
-            this.markEntry(id);
-        }
+    public hasOutput(id: string): boolean {
+        return this.chunks.has(id) || this.assets.has(id);
     }
 
     public build(context: BuildContext): BuildSnapshot {
-        const modules: ModuleRecord[] = [...this.modules.values()].map(draft => toRecord(draft));
         const snapshot: BuildSnapshot = {
             format: SNAPSHOT_FORMAT,
             schemaVersion: SNAPSHOT_SCHEMA_VERSION,
@@ -140,10 +137,10 @@ export class SnapshotBuilder {
             createdAt: context.createdAt,
             bundler: context.bundler ?? { name: 'unknown' },
             root: context.root ?? '.',
-            modules,
+            modules: [...this.modules.values()].map(toRecord),
             chunks: [...this.chunks.values()],
             assets: [...this.assets.values()],
-            imports: this.imports,
+            imports: [...this.imports],
         };
         return context.mode === undefined ? snapshot : { ...snapshot, mode: context.mode };
     }

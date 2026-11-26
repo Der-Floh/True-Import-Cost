@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { jsonSchemaErrors } from './support/jsonSchema';
 import { fixture, inPackage } from './support/snapshot';
 import {
     assetKindOf,
@@ -64,6 +65,53 @@ function errorOf(result: SnapshotParseResult): string {
     }
     return result.error;
 }
+
+function withUnknownFields(): JsonContainer {
+    const root = draft();
+    const paths: JsonPath[] = [[], ['bundler'], ['modules', 2], ['modules', 0, 'contributions', 0], ['chunks', 0], ['assets', 0], ['imports', 0], ['imports', 2]];
+    for (const path of paths) {
+        Object.assign(lookup(root, path), { addedLater: { nested: [1, 2, 3] }, gzipBytes: 120 });
+    }
+    return root;
+}
+
+const MALFORMED: readonly [string, JsonPath, unknown][] = [
+    ['a byte count given as a string', ['modules', 0, 'contributions', 0, 'bytes'], '300'],
+    ['a negative byte count', ['modules', 0, 'contributions', 0, 'bytes'], -1],
+    ['a fractional byte count', ['modules', 0, 'contributions', 0, 'bytes'], 2.5],
+    ['an unknown precision', ['modules', 0, 'contributions', 0, 'precision'], 'exact'],
+    ['an unknown chunk kind', ['chunks', 0, 'kind'], 'wasm'],
+    ['a non-boolean entry flag', ['chunks', 0, 'entry'], 'yes'],
+    ['a chunk import list that is not a list', ['chunks', 0, 'imports'], 'dist/other.js'],
+    ['an unknown asset kind', ['assets', 0, 'kind'], 'video'],
+    ['an unknown import kind', ['imports', 0, 'kind'], 'import-statement'],
+    ['a non-boolean external flag', ['imports', 2, 'external'], 1],
+    ['a negative creation time', ['createdAt'], -1],
+    ['an empty target name', ['target'], ''],
+    ['an empty package version', ['modules', 2, 'packageVersion'], ''],
+    ['a bundler given as a string', ['bundler'], 'esbuild'],
+    ['a module list given as an object', ['modules'], {}],
+    ['an unknown build mode', ['mode'], 'staging'],
+];
+
+const REQUIRED: readonly [string, JsonPath][] = [
+    ['the contributions of a module', ['modules', 0, 'contributions']],
+    ['the kind of an import', ['imports', 0, 'kind']],
+    ['the dynamic imports of a chunk', ['chunks', 0, 'dynamicImports']],
+    ['the root', ['root']],
+    ['the bundler name', ['bundler', 'name']],
+];
+
+const INCONSISTENT: readonly [string, () => JsonContainer][] = [
+    ['a module listed twice', () => withPushed(['modules'], VALID.modules[1])],
+    ['a chunk and an asset with the same id', () => withValue(['assets', 0, 'id'], 'dist/main.js')],
+    ['a contribution to an output that does not exist', () => withValue(['modules', 0, 'contributions', 0, 'chunkId'], 'dist/gone.js')],
+    ['an import whose importer is not a module', () => withValue(['imports', 0, 'importer'], 'src/gone.ts')],
+    ['an import that resolves to a module that does not exist', () => withValue(['imports', 0, 'resolvedModule'], 'src/gone.ts')],
+    ['an import that is neither external nor resolved', () => without(['imports', 0, 'resolvedModule'])],
+    ['a chunk whose entry module does not exist', () => withValue(['chunks', 0, 'entryModule'], 'src/gone.ts')],
+    ['a chunk that loads an output that does not exist', () => withValue(['chunks', 0, 'imports'], ['dist/gone.js'])],
+];
 
 describe('assetKindOf', () => {
     it('classifies output files by extension, ignoring case', () => {
@@ -136,6 +184,10 @@ describe('parseSnapshot', () => {
         expect(result.ok && result.snapshot.modules[0]).toEqual(VALID.modules[0]);
     });
 
+    it('accepts a snapshot with fields it does not know at every level, and returns it without them', () => {
+        expect(parseSnapshot(withUnknownFields())).toEqual({ ok: true, snapshot: VALID });
+    });
+
     it('ignores a "__proto__" key without polluting Object.prototype', () => {
         const text = JSON.stringify(VALID).replace('{"format"', '{"__proto__":{"polluted":true,"modules":[]},"format"');
 
@@ -151,47 +203,34 @@ describe('parseSnapshot', () => {
         }
     });
 
-    it('rejects a different format marker', () => {
-        expect(errorOf(parseSnapshot(withValue(['format'], 'true-import-cost/rollup-build'))))
-            .toBe('the metadata is not a true-import-cost/build-snapshot');
-        expect(errorOf(parseSnapshot(without(['format'])))).toBe('the metadata is not a true-import-cost/build-snapshot');
+    it('says that metadata of another format is not a build snapshot', () => {
+        const notASnapshot = 'the metadata is not a True Import Cost build snapshot: its format is not "true-import-cost/build-snapshot"';
+
+        expect(errorOf(parseSnapshot(withValue(['format'], 'true-import-cost/rollup-build')))).toBe(notASnapshot);
+        expect(errorOf(parseSnapshot(without(['format'])))).toBe(notASnapshot);
     });
 
-    it('rejects other schema versions with a message naming the supported one', () => {
-        expect(errorOf(parseSnapshot(withValue(['schemaVersion'], 2))))
-            .toBe('schema version 2 is not supported; this version of True Import Cost reads version 1');
-        expect(errorOf(parseSnapshot(withValue(['schemaVersion'], '1')))).toMatch(/^schema version 1 is not supported/);
-        expect(errorOf(parseSnapshot(without(['schemaVersion'])))).toMatch(/^schema version undefined is not supported/);
+    it('asks for an update to read a snapshot of a newer schema version', () => {
+        for (const version of [2, 17]) {
+            expect(errorOf(parseSnapshot(withValue(['schemaVersion'], version))))
+                .toBe(`the snapshot was written by a newer True Import Cost (schema version ${version}); update the extension or the CLI to read it`);
+        }
     });
 
-    it.each<[string, JsonPath, unknown]>([
-        ['a byte count given as a string', ['modules', 0, 'contributions', 0, 'bytes'], '300'],
-        ['a negative byte count', ['modules', 0, 'contributions', 0, 'bytes'], -1],
-        ['a fractional byte count', ['modules', 0, 'contributions', 0, 'bytes'], 2.5],
-        ['an unknown precision', ['modules', 0, 'contributions', 0, 'precision'], 'exact'],
-        ['an unknown chunk kind', ['chunks', 0, 'kind'], 'wasm'],
-        ['a non-boolean entry flag', ['chunks', 0, 'entry'], 'yes'],
-        ['a chunk import list that is not a list', ['chunks', 0, 'imports'], 'dist/other.js'],
-        ['an unknown asset kind', ['assets', 0, 'kind'], 'video'],
-        ['an unknown import kind', ['imports', 0, 'kind'], 'import-statement'],
-        ['a non-boolean external flag', ['imports', 2, 'external'], 1],
-        ['a negative creation time', ['createdAt'], -1],
-        ['an empty target name', ['target'], ''],
-        ['an empty package version', ['modules', 2, 'packageVersion'], ''],
-        ['a bundler given as a string', ['bundler'], 'esbuild'],
-        ['a module list given as an object', ['modules'], {}],
-        ['an unknown build mode', ['mode'], 'staging'],
-    ])('rejects %s', (_, path, value) => {
+    it('rejects a schema version that is missing or not one True Import Cost ever wrote', () => {
+        expect(errorOf(parseSnapshot(without(['schemaVersion'])))).toBe('the snapshot has no schema version');
+        expect(errorOf(parseSnapshot(withValue(['schemaVersion'], '1')))).toBe('the snapshot\'s schema version is "1", not 1');
+        expect(errorOf(parseSnapshot(withValue(['schemaVersion'], 0)))).toBe('the snapshot\'s schema version is 0, not 1');
+        expect(errorOf(parseSnapshot(withValue(['schemaVersion'], 1.5)))).toBe('the snapshot\'s schema version is 1.5, not 1');
+        expect(errorOf(parseSnapshot(withValue(['schemaVersion'], null)))).toBe('the snapshot\'s schema version is not a number');
+        expect(errorOf(parseSnapshot(withValue(['schemaVersion'], { major: 1 })))).toBe('the snapshot\'s schema version is not a number');
+    });
+
+    it.each(MALFORMED)('rejects %s', (_, path, value) => {
         expect(errorOf(parseSnapshot(withValue(path, value)))).toContain(`at ${describePath(path)}`);
     });
 
-    it.each<[string, JsonPath]>([
-        ['the contributions of a module', ['modules', 0, 'contributions']],
-        ['the kind of an import', ['imports', 0, 'kind']],
-        ['the dynamic imports of a chunk', ['chunks', 0, 'dynamicImports']],
-        ['the root', ['root']],
-        ['the bundler name', ['bundler', 'name']],
-    ])('rejects a snapshot missing %s', (_, path) => {
+    it.each(REQUIRED)('rejects a snapshot missing %s', (_, path) => {
         expect(parseSnapshot(without(path)).ok).toBe(false);
     });
 
@@ -246,6 +285,18 @@ describe('parseSnapshot', () => {
             .toBe('chunk "dist/main.js" names unknown entry module "src/gone.ts"');
     });
 
+    it.each(['imports', 'dynamicImports', 'css', 'assets'])('rejects a chunk whose %s name an output that does not exist', (field) => {
+        expect(errorOf(parseSnapshot(withValue(['chunks', 0, field], ['dist/gone.js']))))
+            .toBe('chunk "dist/main.js" loads unknown output "dist/gone.js"');
+    });
+
+    it('accepts a chunk that loads any chunk or asset of the snapshot', () => {
+        const root = withValue(['chunks', 0, 'dynamicImports'], ['dist/logo.png']);
+        lookup(root, ['chunks', 0]).imports = ['dist/main.js.map'];
+
+        expect(parseSnapshot(root).ok).toBe(true);
+    });
+
     it('keeps the error message short when many fields are wrong', () => {
         const modules = Array.from({ length: 200 }, (_, index) => ({ id: `m${index}`, path: 42, contributions: 'none' }));
 
@@ -253,5 +304,47 @@ describe('parseSnapshot', () => {
 
         expect(error).toHaveLength(601);
         expect(error.endsWith('…')).toBe(true);
+    });
+});
+
+describe('the JSON Schema of a snapshot', () => {
+    it('accepts what parseSnapshot accepts, with and without the optional fields', () => {
+        const root = draft();
+        root.mode = 'development';
+        root.bundler = { name: 'vite', version: '8.3.8', engine: 'rolldown 1.0.0' };
+        Object.assign(lookup(root, ['modules', 1]), { virtual: true, sourceBytes: 512 });
+
+        expect(jsonSchemaErrors(draft())).toEqual([]);
+        expect(jsonSchemaErrors(root)).toEqual([]);
+    });
+
+    it('accepts fields it does not know at every level, as parseSnapshot does', () => {
+        expect(jsonSchemaErrors(withUnknownFields())).toEqual([]);
+    });
+
+    it.each(MALFORMED)('rejects %s, as parseSnapshot does', (_, path, value) => {
+        expect(jsonSchemaErrors(withValue(path, value))).not.toEqual([]);
+    });
+
+    it.each(REQUIRED)('rejects a snapshot missing %s, as parseSnapshot does', (_, path) => {
+        expect(jsonSchemaErrors(without(path))).not.toEqual([]);
+    });
+
+    it('rejects metadata of another format and every other schema version', () => {
+        for (const value of [withValue(['format'], 'true-import-cost/rollup-build'), without(['format']), withValue(['schemaVersion'], 2), without(['schemaVersion'])]) {
+            expect(jsonSchemaErrors(value)).not.toEqual([]);
+        }
+    });
+
+    it('applies the same limits to strings and names as parseSnapshot', () => {
+        expect(jsonSchemaErrors(withValue(['root'], 'r'.repeat(SNAPSHOT_LIMITS.maxTextLength)))).toEqual([]);
+        expect(jsonSchemaErrors(withValue(['root'], 'r'.repeat(SNAPSHOT_LIMITS.maxTextLength + 1)))).toEqual(['/root must NOT have more than 4096 characters']);
+        expect(jsonSchemaErrors(withValue(['modules', 2, 'packageName'], 'n'.repeat(256)))).toEqual([]);
+        expect(jsonSchemaErrors(withValue(['modules', 2, 'packageName'], 'n'.repeat(257)))).toEqual(['/modules/2/packageName must NOT have more than 256 characters']);
+    });
+
+    it.each(INCONSISTENT)('leaves %s to parseSnapshot, which rejects it', (_, value) => {
+        expect(jsonSchemaErrors(value())).toEqual([]);
+        expect(parseSnapshot(value()).ok).toBe(false);
     });
 });

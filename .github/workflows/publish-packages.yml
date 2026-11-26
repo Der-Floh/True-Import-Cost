@@ -12,6 +12,7 @@ on:
           - vite
           - webpack
           - cli
+          - snapshot
 
 concurrency:
   group: npm-publish-${{ inputs.package }}

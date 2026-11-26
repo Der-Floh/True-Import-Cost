@@ -3,11 +3,10 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { attributeFile, graphOf, only } from './support';
+import { attributeFile, graphOf, only, readSnapshot } from './support';
 import { BUNDLERS, buildFixture, bundlerVersion, WEBPACK_FIXTURE } from './webpackSupport';
 import { duplicatePackages } from '../../core/graph/duplicates';
 import { explainInclusion } from '../../core/graph/whyIncluded';
-import { parseSnapshot } from '../../core/schema/validate';
 import { TrueImportCostPlugin } from '../../plugins/webpack';
 
 import type { AttributedImport } from './support';
@@ -21,14 +20,6 @@ function temporaryDirectory(): string {
     const directory = mkdtempSync(path.join(tmpdir(), 'true-import-cost-webpack-'));
     directories.push(directory);
     return directory;
-}
-
-function readSnapshot(file: string): BuildSnapshot {
-    const result = parseSnapshot(JSON.parse(readFileSync(file, 'utf8')));
-    if (!result.ok) {
-        throw new Error(result.error);
-    }
-    return result.snapshot;
 }
 
 async function buildSnapshot(bundler: Bundler, build: Partial<FixtureBuild> = {}, target = 'extension-host'): Promise<{ snapshot: BuildSnapshot; outputPath: string; outDir: string }> {

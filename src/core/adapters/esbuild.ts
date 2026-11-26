@@ -160,6 +160,20 @@ function linkedOutputs(output: OutputRecord, outputs: ReadonlyMap<string, Output
     return output.imports.filter(record => !record.external && outputs.has(record.path) && wanted(record)).map(record => record.path);
 }
 
+function entryModules(inputs: ReadonlyMap<string, InputRecord>, outputs: ReadonlyMap<string, OutputRecord>, idOf: (path: string) => string): Set<string> {
+    const loadedLazily = new Set<string>();
+    for (const input of inputs.values()) {
+        for (const record of input.imports) {
+            if (!record.external && importKindOf(record.kind) === 'dynamic') {
+                loadedLazily.add(idOf(record.path));
+            }
+        }
+    }
+    const candidates = new Set([...outputs.values()].flatMap(output => (output.entryPoint === undefined ? [] : [idOf(output.entryPoint)])));
+    const roots = [...candidates].filter(id => !loadedLazily.has(id));
+    return new Set(roots.length > 0 ? roots : candidates);
+}
+
 export function isEsbuildMetafile(value: unknown): value is EsbuildMetafile {
     return isRecord(value) && isRecord(value.inputs) && isRecord(value.outputs) && value.format === undefined;
 }
@@ -215,9 +229,6 @@ export function normalizeEsbuildMetafile(metafile: unknown, context: BuildContex
     }
 
     for (const [path, output] of outputs) {
-        if (output.entryPoint !== undefined) {
-            builder.markEntryCandidate(idOf(output.entryPoint));
-        }
         const chunkKind = chunkKindOf(path);
         if (chunkKind === undefined) {
             builder.asset({ id: path, kind: assetKindOf(path), bytes: output.bytes });
@@ -231,7 +242,8 @@ export function normalizeEsbuildMetafile(metafile: unknown, context: BuildContex
         }
     }
 
-    builder.resolveEntryCandidates();
+    const entries = entryModules(inputs, outputs, idOf);
+    entries.forEach(id => builder.markEntry(id));
 
     for (const [path, output] of outputs) {
         const chunkKind = chunkKindOf(path);
@@ -239,7 +251,7 @@ export function normalizeEsbuildMetafile(metafile: unknown, context: BuildContex
             continue;
         }
         const entryModule = output.entryPoint === undefined ? undefined : idOf(output.entryPoint);
-        const isEntry = entryModule !== undefined && builder.isEntry(entryModule);
+        const isEntry = entryModule !== undefined && entries.has(entryModule);
         builder.chunk({
             id: path,
             kind: chunkKind,

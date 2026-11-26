@@ -73,41 +73,14 @@ describe('SnapshotBuilder edges', () => {
 });
 
 describe('SnapshotBuilder entries', () => {
-    function withModules(...ids: string[]): SnapshotBuilder {
+    it('marks the modules it has as entries and ignores unknown ones', () => {
         const builder = new SnapshotBuilder();
-        ids.forEach(id => builder.module(id, id));
-        return builder;
-    }
-
-    it('marks the entry candidates that nothing imports', () => {
-        const builder = withModules('main', 'lazy', 'worker');
-        builder.edge({ importer: 'main', resolvedModule: 'lazy', kind: 'dynamic', external: false });
-        ['main', 'lazy', 'worker'].forEach(id => builder.markEntryCandidate(id));
-
-        builder.resolveEntryCandidates();
-
-        expect(['main', 'lazy', 'worker'].map(id => builder.isEntry(id))).toEqual([true, false, true]);
-    });
-
-    it('marks every candidate when each of them is imported', () => {
-        const builder = withModules('a', 'b');
-        builder.edge({ importer: 'a', resolvedModule: 'b', kind: 'static', external: false });
-        builder.edge({ importer: 'b', resolvedModule: 'a', kind: 'static', external: false });
-        builder.markEntryCandidate('a');
-        builder.markEntryCandidate('b');
-
-        builder.resolveEntryCandidates();
-
-        expect([builder.isEntry('a'), builder.isEntry('b')]).toEqual([true, true]);
-    });
-
-    it('marks nothing without candidates and ignores unknown modules', () => {
-        const builder = withModules('a');
-        builder.resolveEntryCandidates();
+        builder.module('main', 'src/main.ts');
+        builder.module('util', 'src/util.ts');
+        builder.markEntry('main');
         builder.markEntry('missing');
 
-        expect(builder.isEntry('a')).toBe(false);
-        expect(builder.isEntry('missing')).toBe(false);
+        expect(builder.build(CONTEXT).modules.map(module => [module.id, module.entry])).toEqual([['main', true], ['util', undefined]]);
     });
 });
 
@@ -127,6 +100,17 @@ describe('SnapshotBuilder outputs', () => {
 
         expect(builder.build(CONTEXT).chunks).toEqual([chunkRecord({ id: 'main.js', bytes: 25 })]);
     });
+
+    it('fills in what a chunk leaves out: no entry, and nothing it loads', () => {
+        const builder = new SnapshotBuilder();
+        builder.chunk({ id: 'main.js', kind: 'js', bytes: 10 });
+        builder.chunk({ id: 'lazy.js', kind: 'js', bytes: 5, dynamicEntry: true, entryModule: 'src/lazy.ts', css: ['lazy.css'] });
+
+        expect(builder.build(CONTEXT).chunks).toEqual([
+            chunkRecord({ id: 'main.js', bytes: 10 }),
+            chunkRecord({ id: 'lazy.js', bytes: 5, dynamicEntry: true, entryModule: 'src/lazy.ts', css: ['lazy.css'] }),
+        ]);
+    });
 });
 
 describe('SnapshotBuilder.build', () => {
@@ -144,6 +128,21 @@ describe('SnapshotBuilder.build', () => {
             assets: [],
             imports: [],
         });
+    });
+
+    it('returns a snapshot that later changes to the builder leave alone', () => {
+        const builder = new SnapshotBuilder();
+        builder.module('a', 'a.ts');
+        builder.module('b', 'b.ts');
+        builder.edge({ importer: 'a', resolvedModule: 'b', kind: 'static', external: false });
+        const first = builder.build(CONTEXT);
+
+        builder.edge({ importer: 'b', resolvedModule: 'a', kind: 'static', external: false });
+        builder.contribute('a', 'main.js', 10, 'bundler-reported');
+
+        expect(first.imports).toHaveLength(1);
+        expect(first.modules[0]?.contributions).toEqual([]);
+        expect(builder.build(CONTEXT).imports).toHaveLength(2);
     });
 
     it('takes the id, root, bundler and mode from the context', () => {

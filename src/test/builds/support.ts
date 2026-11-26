@@ -3,9 +3,11 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as esbuild from 'esbuild';
 
+import { jsonSchemaErrors } from '../core/support/jsonSchema';
 import { withPackageVersions } from '../../core/adapters/packageVersions';
 import { attributeImport, locateDocument } from '../../core/attribution/attribute';
 import { BuildGraph } from '../../core/graph/buildGraph';
+import { parseSnapshot } from '../../core/schema/validate';
 import { analyzeDocument, analyzeExports } from '../../parser';
 import { toQuery } from '../../extension/services/importQuery';
 
@@ -21,6 +23,19 @@ export const ESBUILD_FIXTURE = path.join(FIXTURES, 'esbuild-node');
 export const VITE_FIXTURE = path.join(FIXTURES, 'vite-vue');
 
 export const BARRELS_FIXTURE = path.join(FIXTURES, 'esbuild-barrels');
+
+export function readSnapshot(file: string): BuildSnapshot {
+    const value: unknown = JSON.parse(readFileSync(file, 'utf8'));
+    const schemaErrors = jsonSchemaErrors(value);
+    if (schemaErrors.length > 0) {
+        throw new Error(`${file} does not match the JSON Schema of a snapshot: ${schemaErrors.join('; ')}`);
+    }
+    const result = parseSnapshot(value);
+    if (!result.ok) {
+        throw new Error(result.error);
+    }
+    return result.snapshot;
+}
 
 export interface AttributedImport {
     readonly source: SourceImport;

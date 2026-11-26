@@ -33,6 +33,7 @@ describe('the README', () => {
         expect(readme).toContain('@true-import-cost/esbuild');
         expect(readme).toContain('@true-import-cost/webpack');
         expect(readme).toContain('@true-import-cost/cli');
+        expect(readme).toContain('@true-import-cost/snapshot');
     });
 });
 
@@ -50,6 +51,25 @@ describe('the plugin packages', () => {
 
         expect(options.length).toBeGreaterThan(0);
         expect(options.filter(option => !packageReadme.includes(`\`${option}\``))).toEqual([]);
+    });
+});
+
+describe('the snapshot package', () => {
+    it('documents every export', () => {
+        const source = readFileSync('src/plugins/snapshot.ts', 'utf8');
+        const exported = [...source.matchAll(/^export (?:type )?\{([^}]*)\}/gm)].flatMap(match => (match[1] ?? '').split(',').map(name => name.trim()).filter(name => name !== ''));
+        const packageReadme = readFileSync('packages/snapshot/README.md', 'utf8');
+
+        expect(exported.length).toBeGreaterThan(30);
+        expect(exported.filter(name => !new RegExp(`\`${name}[\`(]`).test(packageReadme))).toEqual([]);
+    });
+});
+
+describe('the guide to writing a plugin', () => {
+    it('is linked from the snapshot format and from the architecture', () => {
+        expect(existsSync('docs/writing-a-plugin.md')).toBe(true);
+        expect(readFileSync('docs/snapshot-schema.md', 'utf8')).toContain('(writing-a-plugin.md)');
+        expect(readFileSync('docs/architecture.md', 'utf8')).toContain('(writing-a-plugin.md)');
     });
 });
 
